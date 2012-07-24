@@ -1,0 +1,86 @@
+package com.crispy;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.apache.commons.lang.StringUtils;
+
+import com.google.common.base.Objects;
+
+public class Index {
+	String name;
+	boolean unique;
+	boolean isAuto;
+	CopyOnWriteArrayList<String> columns;
+
+	public static Index create(String column) {
+		return new Index(column, column);
+	}
+
+	public static Index create(String name, boolean unique, String... column) {
+		Index i = new Index(name, column);
+		i.unique = unique;
+		return i;
+	}
+
+	public Index(String name, String... column) {
+		this.name = name;
+		this.columns = new CopyOnWriteArrayList<String>(Arrays.asList(column));
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (!(o instanceof Index))
+			return false;
+		Index oi = (Index) o;
+		if (!Objects.equal(name, oi.name))
+			return false;
+		if (!columns.equals(oi.columns))
+			return false;
+		return true;
+	}
+
+	public static Index findByName(Collection<Index> indexes, String name) {
+		for (Index i : indexes) {
+			if (i.name.equals(name) || i.name.equals("fk_" + name))
+				return i;
+		}
+		return null;
+	}
+
+	public void process(ResultSet results) throws SQLException {
+		String column = results.getString("COLUMN_NAME");
+		int ordinal = results.getShort("ORDINAL_POSITION");
+
+		while (this.columns.size() < ordinal) {
+			this.columns.add(null);
+		}
+
+		this.columns.set(ordinal - 1, column);
+	}
+
+	public String createDefinition() {
+		StringBuilder sb = new StringBuilder();
+		if (unique)
+			sb.append("UNIQUE ");
+		if (name != null) {
+			sb.append("INDEX `" + name + "` ");
+		}
+		sb.append("(`");
+		sb.append(StringUtils.join(columns, "`,`"));
+		sb.append("`)");
+		return sb.toString();
+	}
+
+	
+	public String getColumn(int i) {
+		return columns.get(i);
+	}
+	
+	public boolean hasColumn(String column) {
+		return columns.contains(column);
+	}
+}
