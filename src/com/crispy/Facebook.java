@@ -38,11 +38,14 @@ public class Facebook extends HttpServlet {
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		String path = req.getPathInfo();
 		if (path.equals("/auth_done")) {
+			String code = req.getParameter("code");
+			
+			
 			HttpSession session = req.getSession();
 			if (session.getAttribute("fb_next_url") != null) {
 				resp.sendRedirect((String) session.getAttribute("fb_next_url"));
 			} else {
-				resp.sendRedirect(req.getContextPath());
+				resp.sendRedirect(Url.complete("/"));
 			}
 		}
 	}
