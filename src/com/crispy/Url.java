@@ -139,6 +139,11 @@ public class Url implements Filter {
 	public void init(FilterConfig arg0) throws ServletException {
 	}
 	
+	public static String complete(String url) {
+		return Server.getContext().getContextPath() + url;
+	}
+	
+	
 	public static String friendly(String name) {
 		name = name.toLowerCase();
 		StringBuilder sb = new StringBuilder();
