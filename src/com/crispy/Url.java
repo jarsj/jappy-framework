@@ -138,7 +138,7 @@ public class Url implements Filter {
 	@Override
 	public void init(FilterConfig arg0) throws ServletException {
 	}
-
+	
 	public static String friendly(String name) {
 		name = name.toLowerCase();
 		StringBuilder sb = new StringBuilder();

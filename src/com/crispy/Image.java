@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -17,6 +18,7 @@ import org.json.JSONObject;
 @WebServlet(urlPatterns = { "/images", "/images/*" })
 public class Image extends HttpServlet {
 
+	private AtomicLong mID;
 	private String uploadFolder;
 	private static Image INSTANCE = new Image();
 	
@@ -25,6 +27,7 @@ public class Image extends HttpServlet {
 	}
 	
 	public Image() {
+		mID = new AtomicLong(System.currentTimeMillis());
 	}
 	
 	public void setUploadFolder(String uploadFolder) {
@@ -49,7 +52,7 @@ public class Image extends HttpServlet {
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
 		try {
-			long nextID = Server.getInstance().nextID();
+			long nextID = mID.incrementAndGet();
 			String sourceFileName = req.getHeader("X-File-Name");
 			String ext = sourceFileName.substring(sourceFileName
 					.lastIndexOf('.') + 1);

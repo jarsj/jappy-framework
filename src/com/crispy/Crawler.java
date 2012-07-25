@@ -78,6 +78,11 @@ public class Crawler extends HttpServlet implements Runnable {
 				.values(j.getUrl(), j.getPriority(), j.getMetadata().toString())
 				.add();
 	}
+	
+	public String get(String url) throws Exception {
+		Job j = new Job(url, 0);
+		return internalFetchAndCache(j);
+	}
 
 	public void fetch(Job j) throws Exception {
 		String data = lookupCache(j);

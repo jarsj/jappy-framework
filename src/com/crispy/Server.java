@@ -14,13 +14,10 @@ import javax.servlet.annotation.WebListener;
 public class Server implements ServletContextListener {
 	
 	private static ServletContext context;
+	private static String host;
 	
 	public static ServletContext getContext() {
 		return context;
-	}
-	
-	public Server() {
-		mID = new AtomicLong(System.currentTimeMillis());
 	}
 	
 	@Override
@@ -42,18 +39,12 @@ public class Server implements ServletContextListener {
 		}
 	}
 	
-	
-	
-	public static Server getInstance() {
-		return INSTANCE;
+	public static void init(String host) {
+		Server.host = host;
 	}
 	
-	private static Server INSTANCE = new Server();
-	
-	private AtomicLong mID;
-	
-	public long nextID() {
-		return mID.getAndIncrement();
+	public static String getHost() {
+		return host;
 	}
 }
 	
