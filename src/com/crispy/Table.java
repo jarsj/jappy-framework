@@ -69,6 +69,8 @@ public class Table {
 
 	private JSONObject comment;
 
+	private String average;
+	
 	private boolean ignore;
 
 	private int start;
@@ -520,6 +522,8 @@ public class Table {
 		} else {
 			if (count) {
 				sb.append("COUNT(*)");
+			} else if (average != null) {
+				sb.append("AVG(" + average + ")");
 			} else {
 				sb.append("*");
 			}
@@ -540,7 +544,7 @@ public class Table {
 			}
 		}
 
-		LOG.trace(sb.toString());
+		LOG.info(sb.toString());
 		PreparedStatement pstmt = con.prepareStatement(sb.toString());
 		int c = 1;
 		whereValues(pstmt, c);
@@ -608,6 +612,24 @@ public class Table {
 		return this;
 	}
 
+	public double average(String column) throws SQLException {
+		average = column;
+		Connection con = DB.getConnection();
+		try {
+			PreparedStatement pstmt = createSelectStatement(con, false);
+			ResultSet results = pstmt.executeQuery();
+			if (results.next())
+				return results.getDouble(1);
+			return 0;
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+			throw new IllegalStateException(t);
+		} finally {
+			con.close();
+		}
+		
+	}
+	
 	public long count() throws SQLException {
 		Connection con = DB.getConnection();
 		try {

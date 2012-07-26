@@ -146,9 +146,13 @@ public class DBAdmin extends HttpServlet {
 								rowJSON.put(col.getName(),
 										row.columnAsString(col.getName()));
 								break;
+							case DATETIME:
+								rowJSON.put(col.getName(), 
+										row.dateAsString(col.getName(), "yyyy-MM-dd HH:mm:ss"));
+								break;
 							case DATE:
 								rowJSON.put(col.getName(), row.dateAsString(
-										col.getName(), "yyyy-MM-DD"));
+										col.getName(), "yyyy-MM-dd"));
 								break;
 							case REFERENCE:
 								rowJSON.put(col.getName(),
