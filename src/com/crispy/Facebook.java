@@ -37,6 +37,14 @@ public class Facebook extends HttpServlet {
 				.format("https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=http://%s%s/facebook/auth_done&state=%d",
 						appId, Server.getHost(), Server.getContext().getContextPath(), System.currentTimeMillis());
 	}
+	
+	public static String username(HttpSession session) {
+		String uid = (String) session.getAttribute("uid");
+		if (uid == null)
+			return null;
+		String username = Table.get("facebook").columns("username").where("uid", uid).row().columnAsString("username");
+		return username;
+	}
 
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {

@@ -233,7 +233,7 @@ public class DBAdmin extends HttpServlet {
 		ret.put("iTotalDisplayRecords", rows.size());
 
 		JSONArray data = new JSONArray();
-
+		
 		for (Row r : rows) {
 			JSONArray rowJSON = new JSONArray();
 			for (String column : previewColumns) {
@@ -242,7 +242,11 @@ public class DBAdmin extends HttpServlet {
 					Row toShow = Table.get(cons.getDestTable())
 							.where(cons.getDestColumn(), r.column(column))
 							.row();
-					rowJSON.put(toShow.display());
+					if (toShow == null) {
+						rowJSON.put("NULL");
+					} else {
+						rowJSON.put(toShow.display());
+					}
 				} else {
 					rowJSON.put(Utils.trim(r.columnAsString(column, ""), 30));
 				}

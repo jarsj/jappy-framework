@@ -47,6 +47,11 @@ public class Filter implements javax.servlet.Filter {
 							+ " threw exception. \nRequest was made from "
 							+ request.getRemoteAddr() + " using user-agent "
 							+ request.getHeader("User-Agent"), t);
+			if (t instanceof ServletException)
+				throw (ServletException) t;
+			if (t instanceof IOException)
+				throw (IOException) t;
+			throw new ServletException(t);
 		}
 	}
 

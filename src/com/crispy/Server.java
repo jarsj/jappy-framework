@@ -10,6 +10,8 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
 
+import org.apache.catalina.startup.Tomcat;
+
 @WebListener
 public class Server implements ServletContextListener {
 	
@@ -30,6 +32,7 @@ public class Server implements ServletContextListener {
 		try {
 			Log.info("core", "Initialized Server");
 			Server.context = event.getServletContext();
+			
 			Dynamic d = context.addFilter("url-rewrite",
 					Url.getInstance());
 			d.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST),
