@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
@@ -82,6 +83,21 @@ public class Crawler extends HttpServlet implements Runnable {
 	public String get(String url) throws Exception {
 		Job j = new Job(url, 0);
 		return internalFetchAndCache(j);
+	}
+	
+	public void post(String url) throws Exception {
+		Log.info("crawler", "POST:" + url);
+		HttpPost post = new HttpPost(url);
+		HttpResponse response = httpClient.execute(post);
+		if (response.getStatusLine().getStatusCode() == 200) {
+			HttpEntity entity = response.getEntity();
+			if (entity != null) {
+				EntityUtils.consume(entity);
+			}
+		} else {
+			EntityUtils.consume(response.getEntity());
+		}
+		System.out.println(response.getStatusLine().getStatusCode());
 	}
 
 	public void fetch(Job j) throws Exception {
@@ -218,4 +234,6 @@ public class Crawler extends HttpServlet implements Runnable {
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
 	}
+
+	
 }

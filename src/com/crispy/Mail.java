@@ -32,19 +32,21 @@ public class Mail implements Runnable {
 		props.put("mail.smtp.host", host);
 		props.put("mail.smtp.starttls.enable", "true");
 		props.put("mail.smtp.auth", "true");
+		
 
 		this.username = username;
 		this.password = password;
 
 		background = Executors.newSingleThreadScheduledExecutor();
 		queue = new LinkedBlockingQueue<JSONObject>();
-		background.scheduleAtFixedRate(this, 5, 5, TimeUnit.MINUTES);
+		background.scheduleAtFixedRate(this, 1, 1, TimeUnit.MINUTES);
 	}
 
 	public static Mail getInstance() {
 		return INSTANCE;
 	}
 
+	
 	public void sendMail(JSONObject mail) {
 		if (queue.size() > 100)
 			return;
@@ -61,7 +63,7 @@ public class Mail implements Runnable {
 						return new PasswordAuthentication(username, password);
 					}
 				};
-				Session session = Session.getInstance(props, auth);
+				Session session = Session.getDefaultInstance(props, auth);
 				MimeMessage message = new MimeMessage(session);
 				message.setFrom(new InternetAddress("harsh@zopte.com"));
 				message.addRecipient(Message.RecipientType.TO,

@@ -2,6 +2,7 @@ package com.crispy;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URLEncoder;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -10,6 +11,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.StringUtils;
 import org.json.JSONObject;
 
 @WebServlet("/facebook/*")
@@ -34,10 +37,29 @@ public class Facebook extends HttpServlet {
 		if (next != null)
 			session.setAttribute("fb_next_url", next);
 		return String
-				.format("https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=http://%s%s/facebook/auth_done&state=%d",
-						appId, Server.getHost(), Server.getContext().getContextPath(), System.currentTimeMillis());
+				.format("https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=http://%s%s/facebook/auth_done&state=%d&scope=%s",
+						appId, Server.getHost(), Server.getContext().getContextPath(), System.currentTimeMillis(), StringUtils.join(permissions, ","));
+	}
+
+	public static void publishAction(String action, String object_type, String object_url, HttpSession session) throws Exception {
+		String accessToken = getAccessToken(session);
+		if (accessToken == null)
+			throw new IllegalStateException("Can't publish action without accessToken");
+		Crawler.getInstance().post(
+				String.format("https://graph.facebook.com/me/%s?%s=%s&access_token=%s", action, object_type, URLEncoder.encode(object_url), accessToken));
+	}
+
+	private static String getAccessToken(HttpSession session) {
+		String uid = (String) session.getAttribute("uid");
+		if (uid == null)
+			return null;
+		return Table.get("facebook").columns("access_token").where("uid", uid).row().columnAsString("access_token");
 	}
 	
+	public static boolean isConnected(HttpSession session) {
+		return session.getAttribute("uid") != null;
+	}
+
 	public static String username(HttpSession session) {
 		String uid = (String) session.getAttribute("uid");
 		if (uid == null)
@@ -46,6 +68,21 @@ public class Facebook extends HttpServlet {
 		return username;
 	}
 
+	public static void updateAccessToken(String token, long expiresIn, HttpSession session) throws Exception {
+		String body = Crawler.getInstance().get(
+				String.format("https://graph.facebook.com/me?access_token=%s", token));
+
+		JSONObject me = new JSONObject(body);
+		String uid = me.getString("id");
+		String username = me.getString("username");
+		String name = me.getString("name");
+
+		Table.get("facebook").columns("uid", "access_token", "username", "name", "expires")
+				.values(uid, token, username, name, expiresIn).ignore()
+				.overwrite("access_token", "username", "name", "expires").add();
+		session.setAttribute("uid", uid);
+	}
+	
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		String path = req.getPathInfo();
@@ -60,23 +97,12 @@ public class Facebook extends HttpServlet {
 				String sp[] = body.split("&");
 				String accessToken = sp[0].split("=")[1];
 				long expiresIn = Integer.parseInt(sp[1].split("=")[1]);
-				
+
 				expiresIn = System.currentTimeMillis() + (expiresIn * 1000);
-				
-				body = Crawler.getInstance().get(
-						String.format("https://graph.facebook.com/me?access_token=%s", accessToken));
 
-				JSONObject me = new JSONObject(body);
-				String uid = me.getString("id");
-				String username = me.getString("username");
-				String name = me.getString("name");
-
-				Table.get("facebook").columns("uid", "access_token", "username", "name", "expires")
-						.values(uid, accessToken, username, name, expiresIn).ignore()
-						.overwrite("access_token", "username", "name", "expires").add();
-				
 				HttpSession session = req.getSession();
-				session.setAttribute("uid", uid);
+				
+				updateAccessToken(accessToken, expiresIn, session);
 				
 				if (session.getAttribute("fb_next_url") != null) {
 					resp.sendRedirect((String) session.getAttribute("fb_next_url"));
