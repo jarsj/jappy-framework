@@ -77,6 +77,8 @@ public class Table {
 
 	private boolean ignoreNull;
 
+	private String groupBy;
+
 	public static Table get(String name) {
 		Table t = new Table(name);
 		return t;
@@ -474,6 +476,13 @@ public class Table {
 		}
 
 		for (Table t : joins) {
+			if (t.groupBy != null) {
+				sb.append(" GROUP BY `" + t.name + "`." + t.groupBy);
+				break;
+			}
+		}
+		
+		for (Table t : joins) {
 			if (t.orderBy != null) {
 				sb.append(" ORDER BY `" + t.name + "`." + t.orderBy);
 				break;
@@ -530,6 +539,10 @@ public class Table {
 		}
 		sb.append(" FROM `" + name + "`");
 		whereStatement(sb);
+		if (groupBy != null) {
+			sb.append(" GROUP BY `" + groupBy + "`");
+		}
+		
 		if (orderBy != null) {
 			sb.append(" ORDER BY " + orderBy);
 		}
@@ -738,6 +751,11 @@ public class Table {
 
 	public Table join(Table t) {
 		joins.add(t);
+		return this;
+	}
+	
+	public Table groupBy(String column) {
+		this.groupBy = column;
 		return this;
 	}
 
