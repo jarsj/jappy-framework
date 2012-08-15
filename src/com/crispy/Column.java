@@ -40,6 +40,12 @@ public class Column {
 		return new Column(name, "VARCHAR(" + length + ")");
 	}
 
+	public static Column text(String name, int length, String def) {
+		Column c = Column.text(name, length);
+		c.def = "'" + def + "'";
+		return c;
+	}
+	
 	public static Column text(String name) {
 		return new Column(name, "TEXT");
 	}

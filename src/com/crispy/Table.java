@@ -675,7 +675,7 @@ public class Table {
 
 	public Table nextNDays(String column, int N) {
 		WhereExp exp = new WhereExp();
-		exp.exp = "(DATE(`" + column + "`)>=CURRENT_DATE() AND DATE(`" + column
+		exp.exp = "(DATE(`" + column + "`)>CURRENT_DATE() AND DATE(`" + column
 				+ "`)<=DATE_ADD(CURRENT_DATE(), INTERVAL " + N + " DAY))";
 		exp.values = new Object[0];
 		where.add(exp);
