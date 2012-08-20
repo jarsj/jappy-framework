@@ -32,6 +32,10 @@ public class Facebook extends HttpServlet {
 	public static String connect(String... permissions) throws Exception {
 		return connect(null, null, permissions);
 	}
+	
+	public static Row item(long uid) {
+		return Table.get("facebook").columns("uid", "username", "name").where("uid", uid).row();
+	}
 
 	public static String connect(HttpSession session, String next, String... permissions) throws Exception {
 		if (next != null)
