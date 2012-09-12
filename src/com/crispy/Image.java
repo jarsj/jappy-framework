@@ -42,9 +42,13 @@ public class Image extends HttpServlet {
 		if (extension.equals("jpg")) {
 			extension = "jpeg";
 		}
+		File realFile = new File(Image.getInstance().uploadFolder, fileName);
+		if (!realFile.exists()) {
+			resp.setStatus(402);
+			return;
+		}
 		resp.setContentType("image/" + extension);
-		IOUtils.copy(new FileInputStream(new File(Image.getInstance()
-				.uploadFolder, fileName)), resp.getOutputStream());
+		IOUtils.copy(new FileInputStream(realFile), resp.getOutputStream());
 		resp.getOutputStream().flush();
 	}
 

@@ -71,6 +71,14 @@ public class Facebook extends HttpServlet {
 		String username = Table.get("facebook").columns("username").where("uid", uid).row().columnAsString("username");
 		return username;
 	}
+	
+	public static String profilePic(HttpSession session) {
+		String username = username(session);
+		if (username == null) {
+			return "http://www.crabplace.com/images/facebook-profile-default.gif";
+		}
+		return String.format("http://graph.facebook.com/%s/picture?type=square", username);
+	}
 
 	public static void updateAccessToken(String token, long expiresIn, HttpSession session) throws Exception {
 		String body = Crawler.getInstance().get(
