@@ -159,13 +159,18 @@ public class DBAdmin extends HttpServlet {
 										row.columnAsString(col.getName()));
 								Constraint cons = m
 										.getConstraint(col.getName());
+								Metadata dstMeta = DB.getMetadata(cons.getDestTable());
 								Row remote = Table
 										.get(cons.getDestTable())
 										.where(cons.getDestColumn(),
 												row.column(col.getName()))
-										.columns(m.getDisplay()).row();
-								remoteJSON.put(col.getName(), StringEscapeUtils
-										.escapeHtml(remote.display()));
+										.columns(dstMeta.getDisplay()).row();
+								if (remote == null) {
+									remoteJSON.put(col.getName(), "");
+								} else {
+									remoteJSON.put(col.getName(), StringEscapeUtils
+											.escapeHtml(remote.display()));
+								}
 								break;
 							}
 						}
