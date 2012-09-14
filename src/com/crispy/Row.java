@@ -8,6 +8,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Row implements IJSONConvertible {
@@ -58,6 +59,10 @@ public class Row implements IJSONConvertible {
 		if (s.length() > limit)
 			return s.substring(0, limit) + "...";
 		return s;
+	}
+	
+	public JSONObject columnAsJSONObject(String name) throws JSONException {
+		return new JSONObject(columnAsString(name));
 	}
 
 	public String columnAsString(String name, int limit) {
