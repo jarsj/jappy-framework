@@ -1,19 +1,20 @@
 package com.crispy;
 
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collection;
+import java.util.Formatter;
 import java.util.HashMap;
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
 
 import org.json.JSONArray;
-
 import com.crispy.DB;
 
 public class Utils {
@@ -131,5 +132,22 @@ public class Utils {
 		trim = trim.replaceAll("\\s+", " ");
 		trim = trim.trim();
 		return trim;
+	}
+	
+	public static String sha1(String inp) throws NoSuchAlgorithmException, UnsupportedEncodingException {
+		MessageDigest md = MessageDigest.getInstance("SHA-1");
+		md.reset();
+		md.update(inp.getBytes("UTF-8"));
+		return byteToHex(md.digest());
+	}
+	
+	public static String byteToHex(final byte[] hash)
+	{
+	    Formatter formatter = new Formatter();
+	    for (byte b : hash)
+	    {
+	        formatter.format("%02x", b);
+	    }
+	    return formatter.toString();
 	}
 }
