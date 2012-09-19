@@ -117,7 +117,7 @@ public class Row implements IJSONConvertible {
 	public int columnAsInt(String name) {
 		Object o = column(name);
 		if (o instanceof Number)
-			return (Integer) o;
+			return ((Number) o).intValue();
 		return Integer.parseInt(o.toString());
 	}
 
@@ -136,7 +136,7 @@ public class Row implements IJSONConvertible {
 		if (o == null)
 			return def;
 		if (o instanceof Number)
-			return (Integer) o;
+			return ((Number) o).intValue();
 		return Integer.parseInt(o.toString());
 	}
 
