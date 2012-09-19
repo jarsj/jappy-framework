@@ -3,6 +3,7 @@ package com.crispy.admin;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URLEncoder;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,7 +45,7 @@ public class DBAdmin extends HttpServlet {
 				resp.sendRedirect("dbadmin/");
 				return;
 			}
-
+			
 			String path[] = req.getPathInfo().split("/");
 			if (path.length == 3 && path[2].equals("delete")) {
 				String table = path[1];

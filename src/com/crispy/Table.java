@@ -1,5 +1,6 @@
 package com.crispy;
 
+import java.lang.reflect.Constructor;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -598,6 +599,30 @@ public class Table {
 				ret.add(new Row(results));
 			}
 
+			pstmt.close();
+			return ret;
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+			throw new IllegalStateException(t);
+		} finally {
+			try {
+				con.close();
+			} catch (Throwable t) {
+			}
+		}
+	}
+	
+	public <T> List<T> customRows(Class<T> c) {
+		Connection con = DB.getConnection();
+		try {
+			PreparedStatement pstmt = createSelectStatement(con, false);
+
+			List<T> ret = new ArrayList<T>();
+			ResultSet results = pstmt.executeQuery();
+			Constructor<T> cons = c.getConstructor(ResultSet.class);
+			while (results.next()) {
+				ret.add(cons.newInstance(results));
+			}
 			pstmt.close();
 			return ret;
 		} catch (Throwable t) {

@@ -15,7 +15,7 @@ public class Row implements IJSONConvertible {
 	private HashMap<String, Object> columns;
 	private String table;
 
-	Row(ResultSet results) throws SQLException {
+	protected Row(ResultSet results) throws SQLException {
 		columns = new HashMap<String, Object>();
 		ResultSetMetaData meta = results.getMetaData();
 		for (int c = 0; c < meta.getColumnCount(); c++) {
