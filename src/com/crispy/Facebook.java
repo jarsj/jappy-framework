@@ -122,6 +122,7 @@ public class Facebook extends HttpServlet {
 					resp.sendRedirect(Url.complete("/"));
 				}
 			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 	}
