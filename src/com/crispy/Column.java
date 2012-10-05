@@ -78,6 +78,11 @@ public class Column {
 		return c;
 	}
 	
+	public static Column time(String name) {
+		Column c = new Column(name, "TIME");
+		return c;
+	}
+	
 	public static Column integer(String name) {
 		return new Column(name, "INT");
 	}
@@ -153,6 +158,21 @@ public class Column {
 				return null;
 			return Long.parseLong(value.toString());
 		}
+		if (type.equals("TIME")) {
+			if (value instanceof String) {
+				return DB.parseTime((String) value);
+			}
+			if (value instanceof Long) {
+				return DB.formatAsTime(new Date((Long) value));
+			}
+			if (value instanceof Date) {
+				return value;
+			}
+			if (value instanceof java.util.Date)
+				return DB.formatAsTime((java.util.Date) value);
+			throw new IllegalArgumentException("Value should be of type time");
+		}
+		
 		if (type.equals("DATE")) {
 			if (value instanceof String) {
 				return DB.parseDate((String) value);
@@ -216,7 +236,13 @@ public class Column {
 
 	public SimpleType simpleType(Metadata m) {
 		if (m.getConstraint(name) != null) {
-			return SimpleType.REFERENCE;
+			Constraint c = m.getConstraint(name);
+			Metadata dest = DB.getMetadata(c.destTable);
+			if (dest.getDisplay() != null) {
+				return SimpleType.REFERENCE;
+			} else {
+				return SimpleType.TEXT;
+			}
 		}
 
 		if (type.startsWith("VARCHAR") && comment.length() > 0)
@@ -235,6 +261,10 @@ public class Column {
 			return SimpleType.LONGTEXT;
 		if (type.equals("DATE"))
 			return SimpleType.DATE;
+		if (type.equals("TIME"))
+			return SimpleType.TIME;
+		if (type.equals("DATETIME"))
+			return SimpleType.DATETIME;
 		if (type.equals("TIMESTAMP"))
 			return SimpleType.TIMESTAMP;
 		return SimpleType.TEXT;

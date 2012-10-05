@@ -100,7 +100,7 @@ public class Metadata {
 	}
 	
 	public String getDisplay() {
-		return comment.optString("display", columns.get(0).getName());
+		return comment.optString("display", null);
 	}
 	
 	public boolean dataEntry() {

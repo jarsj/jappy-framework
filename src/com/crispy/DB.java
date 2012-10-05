@@ -263,6 +263,12 @@ public class DB {
 			return null;
 		return ret;
 	}
+	
+	public static String formatAsTime(Date d) {
+		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
+		String ret = format.format(d);
+		return ret;
+	}
 
 	public static List<Metadata> getTables() {
 		return new ArrayList<Metadata>(INSTANCE.tables.values());
@@ -270,6 +276,15 @@ public class DB {
 
 	public static Date parseDate(String value) {
 		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+		try {
+			return format.parse(value);
+		} catch (ParseException e) {
+			return null;
+		}
+	}
+	
+	public static Date parseTime(String value) {
+		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
 		try {
 			return format.parse(value);
 		} catch (ParseException e) {

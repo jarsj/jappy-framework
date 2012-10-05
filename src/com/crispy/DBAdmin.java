@@ -1,9 +1,7 @@
-package com.crispy.admin;
+package com.crispy;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.URLEncoder;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,7 +9,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-import javax.mail.FetchProfile;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -23,16 +20,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.crispy.Column;
-import com.crispy.Constraint;
-import com.crispy.DB;
-import com.crispy.Metadata;
-import com.crispy.Row;
-import com.crispy.SimpleType;
-import com.crispy.Table;
 import com.crispy.Table.WhereOp;
-import com.crispy.Template;
-import com.crispy.Utils;
+
 
 @WebServlet("/dbadmin/*")
 public class DBAdmin extends HttpServlet {
@@ -60,6 +49,10 @@ public class DBAdmin extends HttpServlet {
 				String table = path[1];
 				String c = req.getParameter("c");
 				Metadata m = DB.getMetadata(table);
+				
+				if (m.getDisplay() == null) {
+					throw new IllegalStateException("This table has no display configured. Don't lookup");
+				}
 
 				JSONArray ret = new JSONArray();
 				List<Row> rows = Table
@@ -227,7 +220,11 @@ public class DBAdmin extends HttpServlet {
 			}
 		}
 
-		if (sSearch != null) {
+		/**
+		 * Note we can only search display columns. If no display column is configured, we 
+		 * can't search. Ideally show this in the UI.
+		 */
+		if (sSearch != null && m.getDisplay() != null) {
 			t = t.where(m.getDisplay(), sSearch + "%", WhereOp.LIKE);
 		}
 

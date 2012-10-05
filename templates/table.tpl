@@ -62,6 +62,8 @@ $(document).ready(function() {
 							<input type="text" class="input-small" id="input${id}" name="${column.name}"><span class="help-inline">YYYY-MM-DD</span>							
 							[#elseif column.type == "DATETIME"]
 							<input type="text" class="input-small" id="input${id}" name="${column.name}"><span class="help-inline">YYYY-MM-DD HH:MM:SS</span>
+							[#elseif column.type == "TIME"]
+							<input type="text" class="input-small" id="input${id}" name="${column.name}"><span class="help-inline">HH:MM:SS</span>
 							[#elseif column.type == "PHOTO"]
 							<input type="file" name="${column.name}" data-prefix="/images/">
 							[#elseif column.type == "REFERENCE"]

@@ -6,6 +6,7 @@ public enum SimpleType {
 	INTEGER,
 	PHOTO,
 	DATE,
+	TIME,
 	DATETIME,
 	TIMESTAMP,
 	REFERENCE
