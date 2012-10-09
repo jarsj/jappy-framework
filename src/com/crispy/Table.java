@@ -153,6 +153,7 @@ public class Table {
 
 	public void create() {
 		try {
+			LOG.debug("create " + name);
 			DB.loadMetadata(name);
 			// If table does not exist.
 			Metadata m = DB.getMetadata(name);

@@ -32,7 +32,6 @@ public class Mail implements Runnable {
 		props.put("mail.smtp.host", host);
 		props.put("mail.smtp.starttls.enable", "true");
 		props.put("mail.smtp.auth", "true");
-		
 
 		this.username = username;
 		this.password = password;
@@ -46,10 +45,13 @@ public class Mail implements Runnable {
 		return INSTANCE;
 	}
 
-	
 	public void sendMail(JSONObject mail) {
 		if (queue.size() > 100)
 			return;
+		if (!(mail.has("to") && mail.has("subject") && mail.has("body"))) {
+			throw new IllegalArgumentException(
+					"Mail JSON misses to, subject or body");
+		}
 		queue.add(mail);
 	}
 

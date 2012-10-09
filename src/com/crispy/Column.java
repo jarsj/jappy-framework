@@ -4,6 +4,8 @@ import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collection;
 
@@ -160,7 +162,7 @@ public class Column {
 		}
 		if (type.equals("TIME")) {
 			if (value instanceof String) {
-				return DB.parseTime((String) value);
+				return parseTime((String) value);
 			}
 			if (value instanceof Long) {
 				return DB.formatAsTime(new Date((Long) value));
@@ -175,7 +177,7 @@ public class Column {
 		
 		if (type.equals("DATE")) {
 			if (value instanceof String) {
-				return DB.parseDate((String) value);
+				return parseDate((String) value);
 			}
 			if (value instanceof Long)
 				return DB.formatAsDate(new Date((Long) value));
@@ -189,7 +191,7 @@ public class Column {
 		}
 		if (type.equals("DATETIME")) {
 			if (value instanceof String) {
-				return DB.parseDateTime((String) value);
+				return parseDateTime((String) value);
 			}
 			if (value instanceof Date)
 				return value;
@@ -277,4 +279,32 @@ public class Column {
 	public String getDefault() {
 		return def;
 	}
+	
+	private static java.util.Date parseDate(String value) {
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+		try {
+			return format.parse(value);
+		} catch (ParseException e) {
+			return null;
+		}
+	}
+	
+	private  static java.util.Date parseTime(String value) {
+		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
+		try {
+			return format.parse(value);
+		} catch (ParseException e) {
+			return null;
+		}
+	}
+	
+	public static java.util.Date parseDateTime(String value) {
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:MM:SS");
+		try {
+			return format.parse(value);
+		} catch (ParseException e) {
+			return null;
+		}
+	}
+
 }

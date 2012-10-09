@@ -26,8 +26,13 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.crispy;
-	
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
+import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.Level;
 import org.apache.log4j.net.SMTPAppender;
 import org.apache.log4j.spi.LoggingEvent;
 import org.json.JSONException;
@@ -37,26 +42,53 @@ import org.json.JSONObject;
  * Extension of Log4j {@link SMTPAppender} for Gmail support
  * 
  * @author abhinav@tgerm.com
- * @see <a href="http://code.google.com/p/log4j-gmail-smtp-appender/">Google Code Project</a> <br/>
+ * @see <a href="http://code.google.com/p/log4j-gmail-smtp-appender/">Google
+ *      Code Project</a> <br/>
  *      <a href="http://www.tgerm.com">My Blog</a>
  */
 public class EC2SMTPAppender extends ConsoleAppender {
-	
+
 	String to;
-	
+
 	public EC2SMTPAppender(String to) {
 		super();
 		this.to = to;
 	}
-	
+
 	@Override
 	public void append(LoggingEvent event) {
-		try {
-			Mail.getInstance().sendMail(new JSONObject().put("to", to).put("subject", "Error: " + event.getLogger().getName() + ":" + event.getMessage()));
-		} catch (JSONException e) {
-			e.printStackTrace();
+		if (event.getLevel().equals(Level.ERROR)) {
+			try {
+				JSONObject mail = new JSONObject();
+				mail.put("to", to);
+				mail.put("subject", "Error: " + event.getLogger().getName()
+						+ ":" + event.getMessage());
+				String body = event.getMessage() + "\n" + "Thread Name : "
+						+ event.getThreadName() + "\n\n";
+
+				if (event.getThrowableInformation() != null) {
+					if (event.getThrowableInformation().getThrowable() != null) {
+						Throwable t = event.getThrowableInformation()
+								.getThrowable();
+						StringWriter sw = new StringWriter();
+						PrintWriter pw = new PrintWriter(sw);
+						t.printStackTrace(pw);
+						pw.flush();
+						body = body + sw.toString();
+					}
+				}
+
+				Mail.getInstance().sendMail(
+						new JSONObject()
+								.put("to", to)
+								.put("subject",
+										"Error: " + event.getLogger().getName()
+												+ ":" + event.getMessage())
+								.put("body", body));
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
 		}
 	}
-	
 
 }

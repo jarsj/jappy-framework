@@ -234,10 +234,6 @@ public class DB {
 		return ret;
 	}
 	
-	public static String formatAsDateTime(Calendar c) {
-		return formatAsDateTime(c.getTime());
-	}
-	
 	public static String formatAsDateTime(java.sql.Date d) {
 		return formatAsDateTime(new Date(d.getTime()));
 	}
@@ -247,12 +243,10 @@ public class DB {
 	}
 
 	public static String formatAsDate(Timestamp t) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
 		return formatAsDate(new Date(t.getTime())); 
 	}
 
 	public static String formatAsDate(java.sql.Date day) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
 		return formatAsDate(new Date(day.getTime()));
 	}
 
@@ -274,30 +268,4 @@ public class DB {
 		return new ArrayList<Metadata>(INSTANCE.tables.values());
 	}
 
-	public static Date parseDate(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
-		try {
-			return format.parse(value);
-		} catch (ParseException e) {
-			return null;
-		}
-	}
-	
-	public static Date parseTime(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
-		try {
-			return format.parse(value);
-		} catch (ParseException e) {
-			return null;
-		}
-	}
-	
-	public static Date parseDateTime(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:MM:SS");
-		try {
-			return format.parse(value);
-		} catch (ParseException e) {
-			return null;
-		}
-	}
 }

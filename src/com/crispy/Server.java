@@ -10,6 +10,7 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
 
+import org.apache.catalina.filters.RemoteIpFilter;
 import org.apache.catalina.startup.Tomcat;
 
 @WebListener
@@ -33,9 +34,12 @@ public class Server implements ServletContextListener {
 			Log.info("core", "Initialized Server");
 			Server.context = event.getServletContext();
 			
-			Dynamic d = context.addFilter("url-rewrite",
+			Dynamic d1 = context.addFilter("remoteip", new RemoteIpFilter());
+			d1.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), false, "/*");
+			
+			Dynamic d2 = context.addFilter("url-rewrite",
 					Url.getInstance());
-			d.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST),
+			d2.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST),
 					false, "/*");
 		} catch (Throwable t) {
 			t.printStackTrace();

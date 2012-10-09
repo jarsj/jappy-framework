@@ -56,6 +56,7 @@ public class Log {
 		if (smtpTo != null) {
 			EC2SMTPAppender email = new EC2SMTPAppender(smtpTo);
 			email.activateOptions();
+			email.setThreshold(Priority.ERROR);
 			l.addAppender(email);
 		}
 
@@ -64,6 +65,7 @@ public class Log {
 			console.setLayout(new PatternLayout(
 					"%d{ISO8601} [%t] %-5p %c %x - %m%n"));
 			console.activateOptions();
+			console.setThreshold(Priority.DEBUG);
 			l.addAppender(console);
 		}
 	}
