@@ -275,6 +275,12 @@ public class Column {
 	public static Column bool(String name) {
 		return new Column(name, "BOOL");
 	}
+	
+	public static Column bool(String name, boolean def) {
+		Column c = new Column(name, "BOOL");
+		c.def = def ? "1": "0";
+		return c;
+	}
 
 	public String getDefault() {
 		return def;
