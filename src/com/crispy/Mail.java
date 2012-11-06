@@ -70,7 +70,7 @@ public class Mail implements Runnable {
 				message.setFrom(new InternetAddress("harsh@zopte.com"));
 				message.addRecipient(Message.RecipientType.TO,
 						new InternetAddress(mail.getString("to")));
-				message.setSubject(mail.getString("subject"));
+				message.setSubject(Utils.trim(mail.getString("subject"), 50));
 				message.setText(mail.getString("body"));
 				Transport.send(message);
 			}

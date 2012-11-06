@@ -3,6 +3,7 @@ package com.crispy;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URLEncoder;
+import java.util.StringTokenizer;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -13,20 +14,32 @@ import javax.servlet.http.HttpSession;
 
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
+import org.json.JSONException;
 import org.json.JSONObject;
+
+import sun.misc.BASE64Decoder;
 
 @WebServlet("/facebook/*")
 public class Facebook extends HttpServlet {
 
 	private static String appId;
 	private static String secret;
-
+	
 	public static void init(String appId, String secret) {
 		Facebook.appId = appId;
 		Facebook.secret = secret;
 		Table.get("facebook")
 				.columns(Column.bigInteger("uid"), Column.text("access_token"), Column.text("username"),
 						Column.text("name"), Column.timestamp("expires")).primary("uid").create();
+	}
+	
+	public static JSONObject parseSignedRequest(String signedRequest) throws Exception {
+		String payload = signedRequest.split(".")[1];
+		BASE64Decoder decoder = new BASE64Decoder();
+		payload = payload.replace("-", "+").replace("_", "/").trim();
+		byte[] decoded = decoder.decodeBuffer(payload);
+		payload = new String(decoded, "UTF8");
+		return new JSONObject(payload);
 	}
 
 	public static String connect(String... permissions) throws Exception {
