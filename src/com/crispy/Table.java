@@ -45,12 +45,12 @@ public class Table {
 			return where;
 		}
 		
-		static WhereExp in(String table, String column, Object ... value) {
+		static WhereExp in(String table, String column, Object value[]) {
 			WhereExp where = new WhereExp();
 			where.exp = table + ".`" + column + "` IN (" + StringUtils.join(Collections.nCopies(value.length, "?"), ",") + ")";
 			where.values = new Object[value.length];
 			for (int i = 0; i < value.length; i++) {
-				where.values[i] = value;
+				where.values[i] = value[i];
 			}
 			return where;
 		}
@@ -648,15 +648,12 @@ public class Table {
 			}
 		}
 	}
+	
+	public Table where(String column, Object value) {
+		return where(column, value, WhereOp.EQUALS);
+	}
 
-	public Table where(String column, Object ... value) {
-		if (value.length == 0) {
-			return this;
-		}
-		if (value.length == 1) {
-			return where(column, value[0], WhereOp.EQUALS);
-		}
-		
+	public Table where(String column, Object value[]) {
 		Metadata m = DB.getMetadata(name);
 		Column c = Column.findByName(m.columns, column);
 		if (c == null) {

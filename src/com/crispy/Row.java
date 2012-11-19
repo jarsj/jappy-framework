@@ -110,7 +110,7 @@ public class Row implements IJSONConvertible {
 		if (o == null)
 			return 0;
 		if (o instanceof Number)
-			return (Long) o;
+			return ((Number) o).longValue();
 		return Long.parseLong(o.toString());
 	}
 
