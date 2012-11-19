@@ -1,11 +1,13 @@
 package com.crispy;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.StringWriter;
 
 import org.json.JSONObject;
 
 import freemarker.template.Configuration;
+import freemarker.template.TemplateException;
 
 public class Template {
 	private static Template INSTANCE = new Template();
@@ -39,11 +41,17 @@ public class Template {
 	public void addFolder(File f) {
 
 	}
-	
-	public static String expand(String template, JSONObject dict) throws Exception {
-		StringWriter sw = new StringWriter();
-		freemarker.template.Template t = getInstance().mConfig.getTemplate(template);
-		t.process(dict, sw, UWrapper.INSTANCE);
-		return sw.toString();
+
+	public static String expand(String template, JSONObject dict)
+			throws IOException {
+		try {
+			StringWriter sw = new StringWriter();
+			freemarker.template.Template t = getInstance().mConfig
+					.getTemplate(template);
+			t.process(dict, sw, UWrapper.INSTANCE);
+			return sw.toString();
+		} catch (TemplateException t) {
+			return "ERROR:" + t.getMessage();
+		}
 	}
 }

@@ -15,6 +15,8 @@ import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import sun.org.mozilla.javascript.internal.ObjArray;
+
 public class Table {
 	public enum WhereOp {
 		EQUALS("="), NOT_EQUALS("!="), GREATER_THAN(">"), LESS_THAN("<"), LIKE(
@@ -40,6 +42,16 @@ public class Table {
 			where.exp = table + ".`" + column + "`" + op.sqlOp() + "?";
 			where.values = new Object[1];
 			where.values[0] = value;
+			return where;
+		}
+		
+		static WhereExp in(String table, String column, Object ... value) {
+			WhereExp where = new WhereExp();
+			where.exp = table + ".`" + column + "` IN (" + StringUtils.join(Collections.nCopies(value.length, "?"), ",") + ")";
+			where.values = new Object[value.length];
+			for (int i = 0; i < value.length; i++) {
+				where.values[i] = value;
+			}
 			return where;
 		}
 	}
@@ -637,8 +649,25 @@ public class Table {
 		}
 	}
 
-	public Table where(String column, Object value) {
-		return where(column, value, WhereOp.EQUALS);
+	public Table where(String column, Object ... value) {
+		if (value.length == 0) {
+			return this;
+		}
+		if (value.length == 1) {
+			return where(column, value[0], WhereOp.EQUALS);
+		}
+		
+		Metadata m = DB.getMetadata(name);
+		Column c = Column.findByName(m.columns, column);
+		if (c == null) {
+			throw new IllegalStateException("No column exists for " + column + " in table " + name);
+		}
+		Object[] parsed = new Object[value.length];
+		for (int i = 0; i < value.length; i++) {
+			parsed[i] = c.parseObject(value[i]);
+		}
+		where.add(WhereExp.in(name, column, parsed));
+		return this;
 	}
 
 	public Table where(String column, Object value, WhereOp op) {

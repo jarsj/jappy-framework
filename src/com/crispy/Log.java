@@ -49,7 +49,8 @@ public class Log {
 		if (logFolder != null) {
 			DailyRollingFileAppender appender = new DailyRollingFileAppender(
 					new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"), new File(
-							logFolder + "/" + id).getAbsolutePath(), "dd-MM-yyyy");
+							logFolder + "/" + id).getAbsolutePath(),
+					"dd-MM-yyyy");
 			appender.setThreshold(Priority.DEBUG);
 			l.addAppender(appender);
 		}
@@ -79,7 +80,11 @@ public class Log {
 	private static Log INSTANCE = new Log();
 
 	public void setFolder(String folder) throws IOException {
-		if (new File(folder).exists() && new File(folder).canWrite()) {
+		File f = new File(folder);
+		if (!f.exists()) {
+			f.mkdirs();
+		}
+		if (f.exists() && f.canWrite()) {
 			this.logFolder = folder;
 			for (Logger l : loggers.values()) {
 				l.removeAllAppenders();
@@ -103,7 +108,7 @@ public class Log {
 			configureAppenders(l);
 		}
 	}
-	
+
 	public void setLevel(Level l) {
 		for (Logger log : loggers.values()) {
 			log.setLevel(l);
