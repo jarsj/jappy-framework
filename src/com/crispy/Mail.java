@@ -14,6 +14,7 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Mail implements Runnable {
@@ -45,6 +46,13 @@ public class Mail implements Runnable {
 		return INSTANCE;
 	}
 
+	public void sendMail(String to, String subject, String body) {
+		try {
+			sendMail(new JSONObject().put("to", to).put("subject", subject).put("body", body));
+		} catch (JSONException e) {
+		}
+	}
+	
 	public void sendMail(JSONObject mail) {
 		if (queue.size() > 100)
 			return;
