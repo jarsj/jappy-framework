@@ -7,6 +7,12 @@ import java.io.IOException;
 import java.util.TimeZone;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.ParseException;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.util.EntityUtils;
 
 import com.maxmind.geoip.LookupService;
 
@@ -53,5 +59,23 @@ public class Net {
 		if (count == 0)
 			return 0;
 		return total / count;
+	}
+	
+	public static String get(String url) throws Exception {
+		String data = null;
+		DefaultHttpClient httpClient = new DefaultHttpClient();
+		HttpGet get = new HttpGet(url);
+		HttpResponse response = httpClient.execute(get);
+		if (response.getStatusLine().getStatusCode() == 200) {
+			HttpEntity entity = response.getEntity();
+			if (entity != null) {
+				data = EntityUtils.toString(entity);
+				EntityUtils.consume(entity);
+			}
+		} else {
+			EntityUtils.consume(response.getEntity());
+		}
+
+		return data;
 	}
 }
