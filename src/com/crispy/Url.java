@@ -17,37 +17,24 @@ import javax.servlet.http.HttpSession;
 
 public class Url implements Filter {
 
-	private ConcurrentHashMap<String, String> levelOne;
-	private ConcurrentHashMap<String, String> levelTwo;
-	private ConcurrentHashMap<String, String> levelTwoId;
-	private ConcurrentHashMap<String, String[]> secured;
+	private static ConcurrentHashMap<String, String> levelOne = new ConcurrentHashMap<String, String>();
+	private static ConcurrentHashMap<String, String> levelTwo = new ConcurrentHashMap<String, String>();
+	private static ConcurrentHashMap<String, String> levelTwoId = new ConcurrentHashMap<String, String>();
+	private static ConcurrentHashMap<String, String[]> secured = new ConcurrentHashMap<String, String[]>();
 
-	private static Url INSTANCE = new Url();
-
-	public static Url getInstance() {
-		return INSTANCE;
+	public static void addRule(String parent, String redirect) {
+		levelOne.put(parent, redirect);
 	}
 
-	private Url() {
-		levelOne = new ConcurrentHashMap<String, String>();
-		levelTwo = new ConcurrentHashMap<String, String>();
-		levelTwoId = new ConcurrentHashMap<String, String>();
-		secured = new ConcurrentHashMap<String, String[]>();
-	}
-
-	public void addRule(String parent, String redirect) {
-		this.levelOne.put(parent, redirect);
-	}
-
-	public void addRule(String parent, String child, boolean id, String redirect) {
+	public static void addRule(String parent, String child, boolean id, String redirect) {
 		if (id) {
-			this.levelTwoId.put(parent + "_" + child, redirect);
+			levelTwoId.put(parent + "_" + child, redirect);
 		} else {
-			this.levelTwo.put(parent + "_" + child, redirect);
+			levelTwo.put(parent + "_" + child, redirect);
 		}
 	}
 	
-	public void secure(String path, String attribute, String redirect) {
+	public static void secure(String path, String attribute, String redirect) {
 		secured.put(path, new String[]{attribute, redirect});
 	}
 
@@ -161,10 +148,9 @@ public class Url implements Filter {
 		return sb.toString();
 	}
 
-	public void setDefault(String def) {
+	public static void setDefault(String def) {
 		if (def.equals("/index.jsp"))
 			throw new IllegalArgumentException("Index.JSP is already default");
 		levelOne.put("index.jsp", def);
 	}
-
 }
