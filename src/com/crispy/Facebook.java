@@ -24,10 +24,12 @@ public class Facebook extends HttpServlet {
 
 	private static String appId;
 	private static String secret;
+	private static String host;
 	
-	public static void init(String appId, String secret) {
+	public static void init(String appId, String secret, String host) {
 		Facebook.appId = appId;
 		Facebook.secret = secret;
+		Facebook.host = host;
 		Table.get("facebook")
 				.columns(Column.bigInteger("uid"), Column.text("access_token"), Column.text("username"),
 						Column.text("name"), Column.timestamp("expires")).primary("uid").create();
@@ -55,7 +57,7 @@ public class Facebook extends HttpServlet {
 			session.setAttribute("fb_next_url", next);
 		return String
 				.format("https://www.facebook.com/dialog/oauth?client_id=%s&redirect_uri=http://%s%s/facebook/auth_done&state=%d&scope=%s",
-						appId, Server.getHost(), Server.getContext().getContextPath(), System.currentTimeMillis(), StringUtils.join(permissions, ","));
+						appId, host, Server.getContextPath(), System.currentTimeMillis(), StringUtils.join(permissions, ","));
 	}
 
 	public static void publishAction(String action, String object_type, String object_url, HttpSession session) throws Exception {
@@ -118,7 +120,7 @@ public class Facebook extends HttpServlet {
 						.getInstance()
 						.get(String
 								.format("https://graph.facebook.com/oauth/access_token?client_id=%s&redirect_uri=http://%s%s/facebook/auth_done&client_secret=%s&code=%s",
-										appId, Server.getHost(), Server.getContext().getContextPath(), secret, code));
+										appId, host, Server.getContextPath(), secret, code));
 				String sp[] = body.split("&");
 				String accessToken = sp[0].split("=")[1];
 				long expiresIn = Integer.parseInt(sp[1].split("=")[1]);

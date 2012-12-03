@@ -8,19 +8,23 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
+import javax.servlet.annotation.WebServlet;
 
-import org.apache.catalina.filters.RemoteIpFilter;
 import org.eclipse.jetty.webapp.WebAppContext;
 
 @WebListener
 public class Server implements ServletContextListener {
 	
-	private static ServletContext context;
-	private static String host;
+	private static ServletContext tomcat_context;
+	private static WebAppContext jetty_context;
 	private static org.eclipse.jetty.server.Server jettyServer;
 	
-	public static ServletContext getContext() {
-		return context;
+	public static String getContextPath() {
+		if (tomcat_context != null)
+			return tomcat_context.getContextPath();
+		if (jetty_context != null)
+			return jetty_context.getContextPath();
+		return null;
 	}
 	
 	@Override
@@ -32,13 +36,8 @@ public class Server implements ServletContextListener {
 	public void contextInitialized(ServletContextEvent event) {
 		try {
 			Log.info("core", "Initialized Server");
-			Server.context = event.getServletContext();
-			
-			Dynamic d1 = context.addFilter("remoteip", new RemoteIpFilter());
-			d1.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), false, "/*");
-			
-			Dynamic d2 = context.addFilter("url-rewrite", Url.class);
-					
+			Server.tomcat_context = event.getServletContext();
+			Dynamic d2 = tomcat_context.addFilter("url-rewrite", Url.class);
 			d2.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST),
 					false, "/*");
 		} catch (Throwable t) {
@@ -50,33 +49,39 @@ public class Server implements ServletContextListener {
 	 * Nothing to do while starting tomcat as context will get initialized automatically. 
 	 * @param host
 	 */
-	public static void startTomcat(String host) {
-		Server.host = host;
+	public static void startTomcat() {
 	}
 	
-	public static void startJetty(String host, int port) throws Exception {
-		Server.host = host;
-		
+	public static void startJetty(int port, Class ... servlets) throws Exception {
 		jettyServer = new org.eclipse.jetty.server.Server(port);
 		WebAppContext context = new WebAppContext();
 		context.setResourceBase("web/");
 		context.setContextPath("/");
 		context.addServlet(DBAdmin.class, "/dbadmin/*");
 		context.addServlet(Resource.class, "/resource/*");
+		
+		for (int i = 0; i < servlets.length; i++) {
+			WebServlet annotation = (WebServlet) servlets[i].getAnnotation(WebServlet.class);
+			for (String path : annotation.urlPatterns()) {
+				context.addServlet(servlets[i], path);
+			}
+		}
+		
 		context.addFilter(Url.class, "/*", EnumSet.of(DispatcherType.REQUEST));
 		jettyServer.setHandler(context);
 		jettyServer.start();
+		
+		Server.jetty_context = context;
 	}
+	
+	
 	
 	public static void stop() throws Exception {
 		if (jettyServer != null) {
 			jettyServer.stop();
 		}
 	}
-	
-	public static String getHost() {
-		return host;
-	}
 }
+
 	
 

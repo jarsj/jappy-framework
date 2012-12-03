@@ -127,7 +127,7 @@ public class Url implements Filter {
 	}
 	
 	public static String complete(String url) {
-		return Server.getContext().getContextPath() + url;
+		return Server.getContextPath() + url;
 	}
 	
 	

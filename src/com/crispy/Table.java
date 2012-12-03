@@ -383,9 +383,11 @@ public class Table {
 		return values.get(index);
 	}
 
-	public void add() throws Exception {
+	public long add() throws Exception {
 		Connection con = DB.getConnection();
 		try {
+			long genId = -1;
+			
 			StringBuilder sb = new StringBuilder();
 			sb.append("INSERT "
 					+ (((overwriteColumns != null) || ignore) ? "IGNORE " : "")
@@ -407,6 +409,7 @@ public class Table {
 			}
 
 			PreparedStatement pstmt = con.prepareStatement(sb.toString());
+			
 			int c = 1;
 			for (Object value : values) {
 				pstmt.setObject(c++, value);
@@ -420,7 +423,14 @@ public class Table {
 			}
 
 			pstmt.executeUpdate();
+			
+			ResultSet generated = pstmt.getGeneratedKeys();
+			if (generated.next()) {
+				genId = generated.getLong(1);
+			}
+			
 			pstmt.close();
+			return genId;
 		} finally {
 			con.close();
 		}

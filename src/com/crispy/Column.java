@@ -205,6 +205,8 @@ public class Column {
 					return null;
 				return new Timestamp(Long.parseLong((String) value));
 			}
+			if (value instanceof java.util.Date) 
+				return new Timestamp(((java.util.Date) value).getTime());
 			if (value instanceof Date)
 				return new Timestamp(((Date) value).getTime());
 			if (value instanceof Calendar)

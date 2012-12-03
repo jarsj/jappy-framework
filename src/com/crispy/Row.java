@@ -6,8 +6,11 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -148,5 +151,21 @@ public class Row implements IJSONConvertible {
 	@Override
 	public JSONObject toJSONObject() {
 		return new JSONObject(columns);
+	}
+	
+	public static JSONObject rowToJSON(Row r) throws JSONException {
+		JSONObject o = new JSONObject();
+		for (Map.Entry<String, Object> entry : r.columns.entrySet()) {
+			o.put(entry.getKey(), entry.getValue());
+		}
+		return o;
+	}
+	
+	public static JSONArray rowsToJSON(List<Row> rows) throws JSONException {
+		JSONArray ret = new JSONArray();
+		for (Row r : rows) {
+			ret.put(rowToJSON(r));
+		}
+		return ret;
 	}
 }
