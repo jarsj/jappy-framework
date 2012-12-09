@@ -35,6 +35,20 @@ public class Net {
 			return IP_SERVICE.getCountryV6(ip).getCode();
 	}
 	
+	
+	public static String getCountryCodeFromName(String name) {
+		Integer index = (Integer) IP_SERVICE.getHashmapcountrynametoindex().get(name);
+		if (index == null)
+			return null;
+		return IP_SERVICE.getCountrycode()[index];
+	}
+
+	
+	public static String getCountryNameFromCode(String code) {
+		Integer index = (Integer) IP_SERVICE.getHashmapcountrycodetoindex().get(code);
+		return IP_SERVICE.getCountryname()[index];
+	}
+	
 	public static String[] countries() {
 		return IP_SERVICE.getCountrycode();
 	}

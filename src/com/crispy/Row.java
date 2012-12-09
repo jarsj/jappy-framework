@@ -156,7 +156,9 @@ public class Row implements IJSONConvertible {
 	public static JSONObject rowToJSON(Row r) throws JSONException {
 		JSONObject o = new JSONObject();
 		for (Map.Entry<String, Object> entry : r.columns.entrySet()) {
-			o.put(entry.getKey(), entry.getValue());
+			String cname = entry.getKey();
+			cname = cname.substring(cname.indexOf('.') + 1);
+			o.put(cname, entry.getValue());
 		}
 		return o;
 	}
