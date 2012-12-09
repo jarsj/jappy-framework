@@ -16,7 +16,7 @@ import org.apache.log4j.Logger;
 @WebFilter("/*")
 public class Filter implements javax.servlet.Filter {
 
-	private Logger LOG;
+	private Log LOG;
 
 	@Override
 	public void destroy() {
@@ -57,6 +57,6 @@ public class Filter implements javax.servlet.Filter {
 
 	@Override
 	public void init(FilterConfig arg0) throws ServletException {
-		LOG = Log.getInstance().getLogger("core");
+		LOG = Log.get("filter");
 	}
 }

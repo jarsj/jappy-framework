@@ -11,11 +11,8 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
-import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import sun.org.mozilla.javascript.internal.ObjArray;
 
 public class Table {
 	public enum WhereOp {
@@ -56,7 +53,7 @@ public class Table {
 		}
 	}
 
-	private final Logger LOG;
+	private final Log LOG;
 
 	private ArrayList<Table> joins;
 
@@ -104,7 +101,7 @@ public class Table {
 	}
 
 	private Table(String name) {
-		LOG = Log.getInstance().getLogger("db");
+		LOG = Log.get("db");
 		deleteOldColumns = false;
 
 		random = false;

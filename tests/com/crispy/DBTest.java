@@ -12,7 +12,6 @@ public class DBTest {
 
 	@BeforeClass
 	public static void setUp() throws Exception {
-		Log.getInstance().enableDump();
 		DB.init("test", "root", "harsh");
 		Table.get("test").drop(true);
 	}

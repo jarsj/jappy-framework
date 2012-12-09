@@ -36,8 +36,10 @@ public class Crawler extends HttpServlet implements Runnable {
 	private DefaultHttpClient httpClient;
 	private ScheduledExecutorService background;
 	private ScheduledFuture<?> future;
+	private Log LOG;
 
 	private Crawler() {
+		LOG = Log.get("crawler");
 		handlers = new ConcurrentHashMap<String, CrawlHandler>();
 	}
 
@@ -47,7 +49,7 @@ public class Crawler extends HttpServlet implements Runnable {
 
 	public void start() {
 		if (!Cache.getInstance().isRunning()) {
-			Log.error("core", "Cache is not configured");
+			LOG.error("Cache is not configured");
 			throw new IllegalStateException(
 					"Crawling won't start unless cache is configured");
 		}
@@ -62,7 +64,7 @@ public class Crawler extends HttpServlet implements Runnable {
 		stats = new ConcurrentHashMap<String, CrawlStats>();
 		future = background
 				.scheduleWithFixedDelay(this, 0, 1, TimeUnit.SECONDS);
-		Log.info("core", "CrawlerConstrucor called again");
+		LOG.info("CrawlerConstrucor called again");
 	}
 
 	public static Crawler getInstance() {
@@ -73,7 +75,7 @@ public class Crawler extends HttpServlet implements Runnable {
 		if (future == null)
 			throw new IllegalStateException(
 					"Scheduling job when there is no crawler running");
-		Log.info("crawler", "Scheduling job url=" + j.getUrl());
+		LOG.info("Scheduling job url=" + j.getUrl());
 		Table.get("crawl_queue")
 				.columns("url", "priority", "metadata")
 				.values(j.getUrl(), j.getPriority(), j.getMetadata().toString())
@@ -86,7 +88,7 @@ public class Crawler extends HttpServlet implements Runnable {
 	}
 	
 	public void post(String url) throws Exception {
-		Log.info("crawler", "POST:" + url);
+		LOG.info("POST:" + url);
 		HttpPost post = new HttpPost(url);
 		HttpResponse response = httpClient.execute(post);
 		if (response.getStatusLine().getStatusCode() == 200) {
@@ -145,7 +147,6 @@ public class Crawler extends HttpServlet implements Runnable {
 
 	@Override
 	public void run() {
-		final Logger LOG = Log.getInstance().getLogger("crawler");
 		try {
 			LOG.trace("new-crawl-run");
 			Row r = Table.get("crawl_queue").limit(1).ascending("priority")
@@ -218,7 +219,7 @@ public class Crawler extends HttpServlet implements Runnable {
 			}
 		} catch (Exception e) {
 			future = null;
-			Log.error("crawler", e.getMessage(), e);
+			LOG.error(e.getMessage(), e);
 			throw new IllegalStateException(e);
 		}
 	}

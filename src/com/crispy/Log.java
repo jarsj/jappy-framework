@@ -1,8 +1,6 @@
 package com.crispy;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -11,113 +9,113 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.Priority;
 
+/**
+ * Logging Library. Captures the most common usecases of logging.
+ * 
+ * @author harsh
+ * 
+ */
 public class Log {
-	private ConcurrentHashMap<String, Logger> loggers;
-	private String logFolder;
-	private String smtpTo;
-	private boolean standard;
-	private Level level;
 
-	public static Log getInstance() {
-		return INSTANCE;
+	private String name;
+	private Logger logger;
+	private String prefix;
+
+	private Log(String name) {
+		this.name = name;
+		this.prefix = "";
+		this.logger = Logger.getLogger(name);
 	}
 
-	public static void info(String id, String message) {
-		INSTANCE.getLogger(id).info(message);
+	public static Log get(String name) {
+		return new Log(name);
+	}
+	
+	public Log file(String folder) {
+		return file(folder, Priority.DEBUG);
 	}
 
-	public static void error(String id, String message) {
-		INSTANCE.getLogger(id).error(message);
-	}
-
-	public Logger getLogger(String id) {
-		if (loggers.containsKey(id)) {
-			return loggers.get(id);
+	public Log file(String folder, Priority p) {
+		if (logger.getAppender("jappy-file") != null) {
+			return this;
 		}
-		Logger l = Logger.getLogger("jappy." + id);
+		File ff = new File(folder);
+		if (!ff.exists()) {
+			ff.mkdir();
+		}
 		try {
-			configureAppenders(l);
-		} catch (Throwable t) {
-		}
-		loggers.putIfAbsent(id, l);
-		return loggers.get(id);
-	}
-
-	private void configureAppenders(Logger l) throws IOException {
-		String id = l.getName().substring(l.getName().lastIndexOf('.') + 1);
-		l.setLevel(level);
-		if (logFolder != null) {
 			DailyRollingFileAppender appender = new DailyRollingFileAppender(
 					new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"), new File(
-							logFolder + "/" + id).getAbsolutePath(),
+							folder + "/" + name).getAbsolutePath(),
 					"dd-MM-yyyy");
-			appender.setThreshold(Priority.DEBUG);
-			l.addAppender(appender);
+			appender.setName("jappy-file");
+			appender.setThreshold(p);
+			logger.addAppender(appender);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		if (smtpTo != null) {
-			EC2SMTPAppender email = new EC2SMTPAppender(smtpTo);
-			email.activateOptions();
-			email.setThreshold(Priority.ERROR);
-			l.addAppender(email);
-		}
-
-		if (standard) {
-			ConsoleAppender console = new ConsoleAppender();
-			console.setLayout(new PatternLayout(
-					"%d{ISO8601} [%t] %-5p %c %x - %m%n"));
-			console.activateOptions();
-			console.setThreshold(Priority.DEBUG);
-			l.addAppender(console);
-		}
+		return this;
 	}
 
-	private Log() {
-		loggers = new ConcurrentHashMap<String, Logger>();
-		standard = false;
-		level = Level.DEBUG;
+	public Log level(Level l) {
+		logger.setLevel(l);
+		return this;
 	}
 
-	private static Log INSTANCE = new Log();
-
-	public void setFolder(String folder) throws IOException {
-		File f = new File(folder);
-		if (!f.exists()) {
-			f.mkdirs();
+	public Log console() {
+		return console(Priority.DEBUG);
+	}
+	
+	public Log console(Priority p) {
+		if (logger.getAppender("jappy-console") != null) {
+			return this;
 		}
-		if (f.exists() && f.canWrite()) {
-			this.logFolder = folder;
-			for (Logger l : loggers.values()) {
-				l.removeAllAppenders();
-				configureAppenders(l);
-			}
-		}
+		ConsoleAppender console = new ConsoleAppender();
+		console.setName("jappy-console");
+		console.setLayout(new PatternLayout(
+				"%d{ISO8601} [%t] %-5p %c %x - %m%n"));
+		console.activateOptions();
+		console.setThreshold(p);
+		logger.addAppender(console);
+		return this;
 	}
 
-	public void sendEmailTo(String to) throws IOException {
-		this.smtpTo = to;
-		for (Logger l : loggers.values()) {
-			l.removeAllAppenders();
-			configureAppenders(l);
-		}
+	public Log email(String to, Priority p) {
+		EC2SMTPAppender email = new EC2SMTPAppender(to);
+		email.setName("jappy-email");
+		email.activateOptions();
+		email.setThreshold(p);
+		logger.addAppender(email);
+		return this;
+	}
+	
+	public Log prefix(String p) {
+		this.prefix = p;
+		this.prefix += " ";
+		return this;
 	}
 
-	public void enableDump() throws IOException {
-		this.standard = true;
-		for (Logger l : loggers.values()) {
-			l.removeAllAppenders();
-			configureAppenders(l);
-		}
+	public void info(String message) {
+		logger.info(prefix + message);
 	}
 
-	public void setLevel(Level l) {
-		for (Logger log : loggers.values()) {
-			log.setLevel(l);
-		}
-		level = l;
+	public void error(String message) {
+		logger.error(prefix + message);
+	}
+	
+	public void error(String message, Throwable t) {
+		logger.error(prefix + message, t);
 	}
 
-	public static void error(String id, String message, Exception e) {
-		Logger LOG = Log.getInstance().getLogger(id);
-		LOG.error(message, e);
+	public void trace(String message) {
+		logger.trace(prefix + message);
+	}
+
+	public void warn(String message) {
+		logger.warn(prefix + message);
+	}
+
+	public void debug(String message) {
+		logger.debug(message);
 	}
 }

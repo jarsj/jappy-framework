@@ -25,6 +25,7 @@ public class DB {
 	private String database;
 	private ConcurrentHashMap<String, Metadata> tables;
 	private static DB INSTANCE = new DB();
+	private static Log LOG = Log.get("db");
 	
 	public static void init(String database, String user, String password)
 			throws SQLException {
@@ -136,7 +137,7 @@ public class DB {
 		try {
 			return INSTANCE.mDS.getConnection();
 		} catch (Throwable t) {
-			Log.error("db", "Couldn't retrieve connection from datastore");
+			LOG.error("Couldn't retrieve connection from datastore");
 			return null;
 		}
 	}
@@ -183,7 +184,7 @@ public class DB {
 
 	public static void updateQuery(Connection con, String sql, Object... args)
 			throws SQLException {
-		Log.info("db", sql);
+		LOG.info(sql);
 		PreparedStatement pstmt = con.prepareStatement(sql);
 		for (int i = 0; i < args.length; i++) {
 			pstmt.setObject(i + 1, args[i]);
@@ -267,5 +268,4 @@ public class DB {
 	public static List<Metadata> getTables() {
 		return new ArrayList<Metadata>(INSTANCE.tables.values());
 	}
-
 }

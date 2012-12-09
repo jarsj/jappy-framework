@@ -29,13 +29,13 @@ public class Server implements ServletContextListener {
 	
 	@Override
 	public void contextDestroyed(ServletContextEvent event) {
-		Log.info("core", "Shutting down server");
+		Log.get("core").info("Shutting down server");
 	}
 
 	@Override
 	public void contextInitialized(ServletContextEvent event) {
 		try {
-			Log.info("core", "Initialized Server");
+			Log.get("core").info("Initialized Server");
 			Server.tomcat_context = event.getServletContext();
 			Dynamic d2 = tomcat_context.addFilter("url-rewrite", Url.class);
 			d2.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST),
