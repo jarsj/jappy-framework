@@ -53,7 +53,7 @@ public class Table {
 		}
 	}
 
-	private final Log LOG;
+	private static final Log LOG = Log.get("db").file("/mnt/logs");
 
 	private ArrayList<Table> joins;
 
@@ -101,7 +101,6 @@ public class Table {
 	}
 
 	private Table(String name) {
-		LOG = Log.get("db");
 		deleteOldColumns = false;
 
 		random = false;
@@ -312,6 +311,9 @@ public class Table {
 		for (int i = 0; i < values.length; i++) {
 			String columnName = columnNames.get(i);
 			Column c = Column.findByName(m.columns, columnName);
+			if (c == null) {
+				throw new IllegalStateException("Missing column " + columnName + " in table " + name);
+			}
 			this.values.add(c.parseObject(values[i]));
 		}
 		return this;
