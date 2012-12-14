@@ -1,6 +1,7 @@
 package com.crispy;
 
 import java.io.File;
+import java.util.Enumeration;
 
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -17,6 +18,10 @@ import org.apache.log4j.Priority;
  */
 public class Log {
 
+	private static String DEFAULT_FOLDER;
+	private static boolean DEFAULT_CONSOLE;
+	private static Level DEFAULT_LEVEL;
+	
 	private String name;
 	private Logger logger;
 	private String prefix;
@@ -25,11 +30,29 @@ public class Log {
 		this.name = name;
 		this.prefix = "";
 		this.logger = Logger.getLogger(name);
+		if (DEFAULT_CONSOLE) {
+			console();
+		}
+		if (DEFAULT_FOLDER != null) {
+			file(DEFAULT_FOLDER);
+		}
+		if (DEFAULT_LEVEL != null) {
+			level(DEFAULT_LEVEL);
+		}
 	}
 
 	public static Log get(String name) {
 		System.out.println("Initializing new logger " + name);
+		
 		return new Log(name);
+	}
+	
+	public static void globalFile(String folder) {
+		DEFAULT_FOLDER = folder;
+	}
+	
+	public static void globalConsole() {
+		DEFAULT_CONSOLE = true;
 	}
 	
 	public Log file(String folder) {
@@ -37,9 +60,7 @@ public class Log {
 	}
 
 	public Log file(String folder, Priority p) {
-		if (logger.getAppender("jappy-file") != null) {
-			return this;
-		}
+		logger.removeAppender("jappy-file");
 		File ff = new File(folder);
 		if (!ff.exists()) {
 			ff.mkdir();
@@ -68,9 +89,7 @@ public class Log {
 	}
 	
 	public Log console(Priority p) {
-		if (logger.getAppender("jappy-console") != null) {
-			return this;
-		}
+		logger.removeAppender("jappy-console");
 		ConsoleAppender console = new ConsoleAppender();
 		console.setName("jappy-console");
 		console.setLayout(new PatternLayout(
@@ -82,6 +101,7 @@ public class Log {
 	}
 
 	public Log email(String to, Priority p) {
+		
 		EC2SMTPAppender email = new EC2SMTPAppender(to);
 		email.setName("jappy-email");
 		email.activateOptions();
