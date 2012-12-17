@@ -86,7 +86,7 @@ public class Table {
 			return where;
 		}
 		
-		static WhereExp matchAgainst(String table, String[] columns, Object[] value, MatchMode mode) {
+		static WhereExp matchAgainst(String table, String[] columns, String[] value, MatchMode mode) {
 			WhereExp where = new WhereExp();
 			StringBuilder match = new StringBuilder(table + ".`" + columns[0] + "`");
 			for (int i = 1; i < columns.length; i++) {
@@ -736,7 +736,7 @@ public class Table {
 		return this;
 	}
 
-	public Table where(String[] columns, String[] values, MatchMode mode) {
+	public Table search(String[] columns, String query, MatchMode mode) {
 		Metadata m = DB.getMetadata(name);
 		if(columns.length == 0){
 			throw new IllegalStateException("Not a single column available to match");
@@ -747,13 +747,13 @@ public class Table {
 				throw new IllegalStateException("No column exists for " + c + " in table " + name);
 			}
 		}
-		if(values.length == 0){
-			throw new IllegalStateException("Not a single keyword available to match against");
+		if(query == null || query.equals("")){
+			throw new IllegalStateException("No keyword available to match against");
 		}
 		if(mode == null){
 			mode = MatchMode.IN_NATURAL_LANGUAGE_MODE;
 		}
-		where.add(WhereExp.matchAgainst(name, columns, values, mode));
+		where.add(WhereExp.matchAgainst(name, columns, new String[]{query}, mode));
 		return this;
 	}
 
