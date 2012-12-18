@@ -10,6 +10,8 @@ import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
 import javax.servlet.annotation.WebServlet;
 
+import org.eclipse.jetty.servlets.MultiPartFilter;
+import org.eclipse.jetty.util.MultiPartInputStream.MultiPart;
 import org.eclipse.jetty.webapp.WebAppContext;
 
 @WebListener
@@ -59,6 +61,8 @@ public class Server implements ServletContextListener {
 		context.setContextPath("/");
 		context.addServlet(DBAdmin.class, "/dbadmin/*");
 		context.addServlet(Resource.class, "/resource/*");
+		context.addServlet(Image.class, "/images/*");
+		context.addServlet(Image.class, "/images");
 		
 		for (int i = 0; i < servlets.length; i++) {
 			WebServlet annotation = (WebServlet) servlets[i].getAnnotation(WebServlet.class);

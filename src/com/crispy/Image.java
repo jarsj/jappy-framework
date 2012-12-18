@@ -18,20 +18,11 @@ import org.json.JSONObject;
 @WebServlet(urlPatterns = { "/images", "/images/*" })
 public class Image extends HttpServlet {
 
-	private AtomicLong mID;
-	private String uploadFolder;
-	private static Image INSTANCE = new Image();
+	private static AtomicLong mID = new AtomicLong(System.currentTimeMillis());
+	private static String uploadFolder;
 	
-	public static Image getInstance() {
-		return INSTANCE;
-	}
-	
-	public Image() {
-		mID = new AtomicLong(System.currentTimeMillis());
-	}
-	
-	public void setUploadFolder(String uploadFolder) {
-		this.uploadFolder = uploadFolder;
+	public static void setUploadFolder(String uploadFolder) {
+		Image.uploadFolder = uploadFolder;
 	}
 
 	@Override
@@ -42,7 +33,7 @@ public class Image extends HttpServlet {
 		if (extension.equals("jpg")) {
 			extension = "jpeg";
 		}
-		File realFile = new File(Image.getInstance().uploadFolder, fileName);
+		File realFile = new File(Image.uploadFolder, fileName);
 		if (!realFile.exists()) {
 			resp.setStatus(402);
 			return;
@@ -60,10 +51,9 @@ public class Image extends HttpServlet {
 			String sourceFileName = req.getHeader("X-File-Name");
 			String ext = sourceFileName.substring(sourceFileName
 					.lastIndexOf('.') + 1);
-			File f = new File(Image.getInstance().uploadFolder, nextID
+			File f = new File(Image.uploadFolder, nextID
 					+ "." + ext);
 			IOUtils.copy(req.getInputStream(), new FileOutputStream(f));
-
 			resp.getWriter().write(
 					new JSONObject().put("success", true)
 							.put("value", nextID + "." + ext).toString());
@@ -75,8 +65,12 @@ public class Image extends HttpServlet {
 			resp.getWriter().flush();
 		}
 	}
-
-	public String getURL(String reference, Size size) {
+	
+	public File getFile(String reference) {
+		return new File(Image.uploadFolder, reference);
+	}	
+		
+	public String getURL(String reference) {
 		return "/images/" + reference;
-	}
+	}	
 }
