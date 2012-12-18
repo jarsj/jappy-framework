@@ -1,12 +1,17 @@
 package com.crispy;
 
 import java.sql.SQLException;
+import java.util.List;
 
 import junit.framework.Assert;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.crispy.Index.IndexType;
+import com.crispy.Table.EngineType;
+import com.crispy.Table.MatchMode;
 
 public class DBTest {
 
@@ -101,6 +106,26 @@ public class DBTest {
 		}
 	}
 
+	@Test
+	public void testMatchAgainst() throws SQLException{
+		DB.loadMetadata("search");
+		
+		Table.get("search").columns(Column.bigInteger("entity_id"),
+                Column.text("entity_type", 50),
+                Column.text("title", 200),
+                Column.text("content",2048)).primary("entity_id", "entity_type")
+                .indexes(Index.create("FULLTEXT", IndexType.FULLTEXT, "title","content")).engine(EngineType.MY_ISAM)
+                .create();
+		
+		List<Row> rows  = Table.get("search").columns("entity_type", "title", "content").search(new String[]{"title", "content"}, "Tees Maar Khan", MatchMode.IN_NATURAL_LANGUAGE_MODE).rows();
+		int count = 0;
+		for (Row r : rows) {
+			System.out.println(r.column("title")+"--------"+r.column("content"));
+			count++;
+		}
+		System.out.println("TOTAL--------"+count);
+	}
+	
 	@AfterClass
 	public static void tearDown() throws Exception {
 		DB.shutdown();
