@@ -12,17 +12,30 @@ import com.google.common.base.Objects;
 
 public class Index {
 	String name;
-	boolean unique;
 	boolean isAuto;
+	public static enum IndexType{
+		UNIQUE("UNIQUE"), FULLTEXT("FULLTEXT");
+		
+		String index;
+
+		private IndexType(String indx) {
+			this.index = indx;
+		}
+
+		public String getIndex() {
+			return index;
+		}
+	}
+	private IndexType indexType;
 	CopyOnWriteArrayList<String> columns;
 
 	public static Index create(String column) {
 		return new Index(column, column);
 	}
 
-	public static Index create(String name, boolean unique, String... column) {
+	public static Index create(String name, IndexType index, String... column) {
 		Index i = new Index(name, column);
-		i.unique = unique;
+		i.indexType = index;
 		return i;
 	}
 
@@ -36,6 +49,8 @@ public class Index {
 		if (!(o instanceof Index))
 			return false;
 		Index oi = (Index) o;
+		if (indexType != null && indexType != oi.indexType)
+			return false;
 		if (!Objects.equal(name, oi.name))
 			return false;
 		if (!columns.equals(oi.columns))
@@ -64,8 +79,8 @@ public class Index {
 
 	public String createDefinition() {
 		StringBuilder sb = new StringBuilder();
-		if (unique)
-			sb.append("UNIQUE ");
+		if(indexType != null)
+			sb.append(indexType.getIndex()+" ");
 		if (name != null) {
 			sb.append("INDEX `" + name + "` ");
 		}

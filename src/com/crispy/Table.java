@@ -15,6 +15,24 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Table {
+	public enum EngineType {
+		MY_ISAM("MyISAM"), MEMORY("MEMORY"), HEAP("HEAP"), MERGE("MERGE"), MRG_MYISAM(
+				"MRG_MYISAM"), ISAM("ISAM"), MRG_ISAM("MRG_ISAM"), INNODB(
+				"InnoDB"), INNOBASE("INNOBASE"), BDB("BDB"), BERKELEYDB(
+				"BERKELEYDB"), NDBCLUSTER("NDBCLUSTER"), NDB("NDB"), EXAMPLE(
+				"EXAMPLE"), ARCHIVE("ARCHIVE"), CSV("CSV"), FEDERATED(
+				"FEDERATED"), BLACKHOLE("BLACKHOLE");
+
+		String engineType;
+
+		private EngineType(String type) {
+			engineType = type;
+		}
+
+		public String getType() {
+			return engineType;
+		}
+	}
 	public enum WhereOp {
 		EQUALS("="), NOT_EQUALS("!="), GREATER_THAN(">"), LESS_THAN("<"), LIKE(
 				" LIKE ");
@@ -27,6 +45,22 @@ public class Table {
 
 		public String sqlOp() {
 			return sqlOp;
+		}
+	}
+
+	public enum MatchMode {
+		IN_BOOLEAN_MODE("IN BOOLEAN MODE"), IN_NATURAL_LANGUAGE_MODE(
+				"IN NATURAL LANGUAGE MODE"), WITH_QUERY_EXPANSION(
+				"WITH QUERY EXPANSION");
+
+		String mode;
+
+		private MatchMode(String mode) {
+			this.mode = mode;
+		}
+
+		public String sqlMatchMode() {
+			return mode;
 		}
 	}
 
@@ -45,6 +79,20 @@ public class Table {
 		static WhereExp in(String table, String column, Object value[]) {
 			WhereExp where = new WhereExp();
 			where.exp = table + ".`" + column + "` IN (" + StringUtils.join(Collections.nCopies(value.length, "?"), ",") + ")";
+			where.values = new Object[value.length];
+			for (int i = 0; i < value.length; i++) {
+				where.values[i] = value[i];
+			}
+			return where;
+		}
+		
+		static WhereExp matchAgainst(String table, String[] columns, String[] value, MatchMode mode) {
+			WhereExp where = new WhereExp();
+			StringBuilder match = new StringBuilder(table + ".`" + columns[0] + "`");
+			for (int i = 1; i < columns.length; i++) {
+				match.append("," + table + ".`" + columns[i] + "`");
+			}
+			where.exp = "MATCH ("+match.toString()+") AGAINST (" + StringUtils.join(Collections.nCopies(value.length, "?"), " ") + " "+mode.sqlMatchMode()+")";
 			where.values = new Object[value.length];
 			for (int i = 0; i < value.length; i++) {
 				where.values[i] = value[i];
@@ -89,11 +137,19 @@ public class Table {
 
 	private String groupBy;
 
+	private EngineType engineType;
+	
+
 	public static Table get(String name) {
 		Table t = new Table(name);
 		return t;
 	}
 
+	public Table engine(EngineType type) {
+		this.engineType = type;
+		return this;
+	}
+	
 	public Table overwrite(String... column) {
 		this.overwriteColumns = new ArrayList<String>();
 		this.overwriteColumns.addAll(Arrays.asList(column));
@@ -113,6 +169,7 @@ public class Table {
 		where = new ArrayList<Table.WhereExp>();
 		joins.add(this);
 		comment = new JSONObject();
+		engineType = null;
 	}
 
 	public Table deleteOldColumns() {
@@ -213,6 +270,9 @@ public class Table {
 				}
 			}
 
+			if(engineType != null){
+				DB.updateQuery("ALTER TABLE `" + name + "` ENGINE = " + engineType.getType());
+			}
 			if (newIndexes == null)
 				newIndexes = new ArrayList<Index>();
 
@@ -673,6 +733,27 @@ public class Table {
 			parsed[i] = c.parseObject(value[i]);
 		}
 		where.add(WhereExp.in(name, column, parsed));
+		return this;
+	}
+
+	public Table search(String[] columns, String query, MatchMode mode) {
+		Metadata m = DB.getMetadata(name);
+		if(columns.length == 0){
+			throw new IllegalStateException("Not a single column available to match");
+		}
+		for (int i = 0; i < columns.length; i++) {
+			Column c = Column.findByName(m.columns, columns[i]);
+			if (c == null) {
+				throw new IllegalStateException("No column exists for " + c + " in table " + name);
+			}
+		}
+		if(query == null || query.equals("")){
+			throw new IllegalStateException("No keyword available to match against");
+		}
+		if(mode == null){
+			mode = MatchMode.IN_NATURAL_LANGUAGE_MODE;
+		}
+		where.add(WhereExp.matchAgainst(name, columns, new String[]{query}, mode));
 		return this;
 	}
 
