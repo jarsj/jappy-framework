@@ -9,6 +9,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.crispy.Index.IndexType;
 import com.crispy.Table.EngineType;
 import com.crispy.Table.MatchMode;
 
@@ -113,10 +114,10 @@ public class DBTest {
                 Column.text("entity_type", 50),
                 Column.text("title", 200),
                 Column.text("content",2048)).primary("entity_id", "entity_type")
-                .indexes(Index.create("FULLTEXT", false, "title","content")).engine(EngineType.MY_ISAM)
+                .indexes(Index.create("FULLTEXT", IndexType.FULLTEXT, "title","content")).engine(EngineType.MY_ISAM)
                 .create();
 		
-		List<Row> rows  = Table.get("search").columns("entity_type", "title", "content").where(new String[]{"title", "content"}, new String[]{"Akshay Kumar", "Tees Maar Khan"}, MatchMode.IN_NATURAL_LANGUAGE_MODE).rows();
+		List<Row> rows  = Table.get("search").columns("entity_type", "title", "content").search(new String[]{"title", "content"}, "Tees Maar Khan", MatchMode.IN_NATURAL_LANGUAGE_MODE).rows();
 		int count = 0;
 		for (Row r : rows) {
 			System.out.println(r.column("title")+"--------"+r.column("content"));

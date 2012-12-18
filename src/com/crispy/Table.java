@@ -270,6 +270,9 @@ public class Table {
 				}
 			}
 
+			if(engineType != null){
+				DB.updateQuery("ALTER TABLE `" + name + "` ENGINE = " + engineType.getType());
+			}
 			if (newIndexes == null)
 				newIndexes = new ArrayList<Index>();
 
@@ -349,9 +352,6 @@ public class Table {
 				}
 			}
 
-			if(engineType != null){
-				DB.updateQuery("ALTER TABLE `" + name + "` ENGINE = " + engineType.getType());
-			}
 			// Reload and reorder metadata
 			DB.loadMetadata(name).reorderAndRetain(newColumns);
 		} catch (Throwable t) {
