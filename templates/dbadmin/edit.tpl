@@ -3,7 +3,7 @@
 		<h1>${table.name}</h1>
 	</div>
 	<div>
-		<form method="POST" action="${root}/dbadmin/${table.name}/edit">
+		<form method="POST" action="/dbadmin/${table.name}/edit">
 			<input type="hidden" name="_c" value="${primaryColumn}"/>
 			<input type="hidden" name="_v" value="${primaryValue}"/>
 			<fieldset>
@@ -22,11 +22,11 @@
 						<input type="text" class="input-min" id="input${id}" name="${column.name}" value="${row[column.name]!""}">
 						[#elseif column.type == "DATE"]
 						<input type="text" class="input-small" id="input${id}" name="${column.name}" value="${row[column.name]!""}"><span class="help-inline">YYYY-MM-DD</span>							
-						[#elseif column.type == "PHOTO"]
-						<input type="file" name="${column.name}" data-prefix="/images/" data-value="${row[column.name]!""}">
+						[#elseif column.type == "FILE"]
+						<input type="file" name="${column.name}" data-folder="${column.folder}" data-value="${row[column.name]!""}">
 						[#elseif column.type == "REFERENCE"]
 						<input type="text" class="input-small" id="input${id}" name="${column.name}" 
-							data-source="${root}/dbadmin/${column.destTable}/lookup?c=${column.destColumn}" data-value="${row[column.name]!""}"
+							data-source="/dbadmin/${column.destTable}/lookup?c=${column.destColumn}" data-value="${row[column.name]!""}"
 							value="${remote[column.name]!""}">
 							<span class="help-inline">Start typing and select</span>							
 						[/#if]

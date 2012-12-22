@@ -80,7 +80,7 @@ public class DBAdmin extends HttpServlet {
 			data.put("root", req.getContextPath());
 			addMetadata(data);
 			PrintWriter out = resp.getWriter();
-			out.write(Template.expand("class:header.tpl", data));
+			out.write(Template.expand("class:dbadmin/header.tpl", data));
 			if (path.length >= 2) {
 				String table = path[1];
 				addTable(data, table);
@@ -111,7 +111,7 @@ public class DBAdmin extends HttpServlet {
 					data.put("primaryColumn", m.getPrimary().getColumn(0));
 					data.put("preview",
 							Utils.arrayToJSON(Arrays.asList(columns(m, 6))));
-					out.write(Template.expand("class:table.tpl", data));
+					out.write(Template.expand("class:dbadmin/table.tpl", data));
 				} else if (path.length == 3) {
 					String c = req.getParameter("c");
 					String v = req.getParameter("v");
@@ -170,13 +170,13 @@ public class DBAdmin extends HttpServlet {
 						data.put("row", rowJSON);
 						data.put("remote", remoteJSON);
 
-						out.write(Template.expand("class:edit.tpl", data));
+						out.write(Template.expand("class:dbadmin/edit.tpl", data));
 					}
 
 				}
 			}
 
-			out.write(Template.expand("class:footer.tpl", data));
+			out.write(Template.expand("class:dbadmin/footer.tpl", data));
 		} catch (Throwable t) {
 			t.printStackTrace();
 			throw new ServletException(t);

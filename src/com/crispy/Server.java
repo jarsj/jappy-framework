@@ -60,9 +60,8 @@ public class Server implements ServletContextListener {
 		context.setResourceBase("web/");
 		context.setContextPath("/");
 		context.addServlet(DBAdmin.class, "/dbadmin/*");
-		context.addServlet(Resource.class, "/resource/*");
-		context.addServlet(Image.class, "/images/*");
-		context.addServlet(Image.class, "/images");
+		context.addServlet(Image.class, "/resource/*");
+		context.addServlet(Image.class, "/resource");
 		
 		for (int i = 0; i < servlets.length; i++) {
 			WebServlet annotation = (WebServlet) servlets[i].getAnnotation(WebServlet.class);

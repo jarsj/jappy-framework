@@ -2,6 +2,7 @@ package com.crispy;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -23,13 +24,28 @@ public class Image extends HttpServlet {
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
-		String fileName = req.getPathInfo().substring(1);
-		String extension = fileName.substring(fileName.lastIndexOf('.') + 1);
+		String fileName = req.getPathInfo();
+		if (fileName.startsWith("/class")) {
+			doClass(fileName.substring(fileName.indexOf('/', 1)), resp);
+		} else if (fileName.startsWith("/local")) {
+			doLocal(fileName.substring(fileName.indexOf('/', 1)), resp);
+		}
+	}
+	
+	
+
+	private void doClass(String path, HttpServletResponse resp) throws IOException {
+		IOUtils.copy(getClass().getResourceAsStream(path),
+				resp.getOutputStream());
+		resp.getOutputStream().flush();
+	}
+
+	private void doLocal(String path, HttpServletResponse resp) throws IOException {
+		String extension = path.substring(path.lastIndexOf('.') + 1);
 		if (extension.equals("jpg")) {
 			extension = "jpeg";
 		}
-		/*
-		File realFile = new File(Image.uploadFolder, fileName);
+		File realFile = new File(path);
 		if (!realFile.exists()) {
 			resp.setStatus(402);
 			return;
@@ -37,8 +53,9 @@ public class Image extends HttpServlet {
 		resp.setContentType("image/" + extension);
 		IOUtils.copy(new FileInputStream(realFile), resp.getOutputStream());
 		resp.getOutputStream().flush();
-		*/
 	}
+
+
 
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
