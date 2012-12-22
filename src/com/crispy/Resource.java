@@ -10,7 +10,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
 
-@WebServlet("/resource/*")
 public class Resource extends HttpServlet {
 
 	@Override

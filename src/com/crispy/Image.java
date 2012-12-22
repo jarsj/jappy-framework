@@ -15,15 +15,10 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
 
-@WebServlet(urlPatterns = { "/images", "/images/*" })
+@WebServlet(urlPatterns = { "/resource", "/resource/*" })
 public class Image extends HttpServlet {
 
 	private static AtomicLong mID = new AtomicLong(System.currentTimeMillis());
-	private static String uploadFolder;
-	
-	public static void setUploadFolder(String uploadFolder) {
-		Image.uploadFolder = uploadFolder;
-	}
 
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -33,6 +28,7 @@ public class Image extends HttpServlet {
 		if (extension.equals("jpg")) {
 			extension = "jpeg";
 		}
+		/*
 		File realFile = new File(Image.uploadFolder, fileName);
 		if (!realFile.exists()) {
 			resp.setStatus(402);
@@ -41,6 +37,7 @@ public class Image extends HttpServlet {
 		resp.setContentType("image/" + extension);
 		IOUtils.copy(new FileInputStream(realFile), resp.getOutputStream());
 		resp.getOutputStream().flush();
+		*/
 	}
 
 	@Override
@@ -49,14 +46,14 @@ public class Image extends HttpServlet {
 		try {
 			long nextID = mID.incrementAndGet();
 			String sourceFileName = req.getHeader("X-File-Name");
+			String uploadFolder = req.getHeader("X-Upload-Folder");
 			String ext = sourceFileName.substring(sourceFileName
 					.lastIndexOf('.') + 1);
-			File f = new File(Image.uploadFolder, nextID
-					+ "." + ext);
+			File f = new File(uploadFolder, nextID + "." + ext);
 			IOUtils.copy(req.getInputStream(), new FileOutputStream(f));
 			resp.getWriter().write(
 					new JSONObject().put("success", true)
-							.put("value", nextID + "." + ext).toString());
+							.put("value", f.getAbsolutePath()).toString());
 			resp.getWriter().flush();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -65,12 +62,4 @@ public class Image extends HttpServlet {
 			resp.getWriter().flush();
 		}
 	}
-	
-	public File getFile(String reference) {
-		return new File(Image.uploadFolder, reference);
-	}	
-		
-	public String getURL(String reference) {
-		return "/images/" + reference;
-	}	
 }

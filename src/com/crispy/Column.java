@@ -9,6 +9,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collection;
 
+import javax.mail.Folder;
+
 import org.apache.commons.lang.StringEscapeUtils;
 
 import com.google.common.base.Objects;
@@ -32,9 +34,15 @@ public class Column {
 		return type;
 	}
 
-	public static Column image(String name, int width, int height) {
+	public static Column file(String name, String folder) {
 		Column c = new Column(name, "VARCHAR(512)");
-		c.comment = width + "," + height;
+		c.comment = "folder:" + folder;
+		return c;
+	}
+	
+	public static Column s3(String name, String bucket) {
+		Column c = new Column(name, "VARCHAR(512)");
+		c.comment = "s3:" + bucket;
 		return c;
 	}
 
@@ -249,8 +257,13 @@ public class Column {
 			}
 		}
 
-		if (type.startsWith("VARCHAR") && comment.length() > 0)
-			return SimpleType.PHOTO;
+		if (type.startsWith("VARCHAR") && comment.length() > 0) {
+			if (comment.startsWith("file:")) {
+				return SimpleType.FILE;
+			} else {
+				return SimpleType.S3;
+			}
+		}
 		if (type.startsWith("VARCHAR")) {
 			String temp = type.substring(type.indexOf('(') + 1,
 					type.indexOf(')'));

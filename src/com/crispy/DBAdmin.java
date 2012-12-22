@@ -136,7 +136,6 @@ public class DBAdmin extends HttpServlet {
 												.getName())));
 								break;
 							case INTEGER:
-							case PHOTO:
 								rowJSON.put(col.getName(),
 										row.columnAsString(col.getName()));
 								break;
