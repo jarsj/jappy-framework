@@ -22,6 +22,12 @@ public class Image extends HttpServlet {
 	private static String uploadFolder;
 	
 	public static void setUploadFolder(String uploadFolder) {
+		File folder = new File(uploadFolder);
+		if (!folder.exists()) {
+			if (!folder.mkdir()) {
+				throw new IllegalStateException("Can't initialize upload folder");
+			}
+		}
 		Image.uploadFolder = uploadFolder;
 	}
 
