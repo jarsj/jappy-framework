@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Chatpat Movies</title>
+    <title>Jappy Framework Admin Page</title>
     <!-- Le styles -->
     <link rel="stylesheet" href="${root}/resource/css/bootstrap.css">
     <link rel="stylesheet" href="${root}/resource/css/fileuploader.css">
