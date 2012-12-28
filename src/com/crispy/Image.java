@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
 
@@ -31,16 +32,16 @@ public class Image extends HttpServlet {
 			doLocal(fileName.substring(fileName.indexOf('/', 1)), resp);
 		}
 	}
-	
-	
 
-	private void doClass(String path, HttpServletResponse resp) throws IOException {
+	private void doClass(String path, HttpServletResponse resp)
+			throws IOException {
 		IOUtils.copy(getClass().getResourceAsStream(path),
 				resp.getOutputStream());
 		resp.getOutputStream().flush();
 	}
 
-	private void doLocal(String path, HttpServletResponse resp) throws IOException {
+	private void doLocal(String path, HttpServletResponse resp)
+			throws IOException {
 		String extension = path.substring(path.lastIndexOf('.') + 1);
 		if (extension.equals("jpg")) {
 			extension = "jpeg";
@@ -55,23 +56,35 @@ public class Image extends HttpServlet {
 		resp.getOutputStream().flush();
 	}
 
-
-
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
 		try {
 			long nextID = mID.incrementAndGet();
 			String sourceFileName = req.getHeader("X-File-Name");
-			String uploadFolder = req.getHeader("X-Upload-Folder");
+			String uploadFolder = req.getParameter("folder");
+			String s3Bucket = req.getParameter("bucket");
 			String ext = sourceFileName.substring(sourceFileName
 					.lastIndexOf('.') + 1);
-			File f = new File(uploadFolder, nextID + "." + ext);
-			IOUtils.copy(req.getInputStream(), new FileOutputStream(f));
-			resp.getWriter().write(
-					new JSONObject().put("success", true)
-							.put("value", f.getAbsolutePath()).toString());
-			resp.getWriter().flush();
+
+			if (uploadFolder != null) {
+				File folder = new File(uploadFolder);
+				folder.mkdirs();
+				File f = new File(folder, nextID + "." + ext);
+				IOUtils.copy(req.getInputStream(), new FileOutputStream(f));
+				resp.getWriter().write(
+						new JSONObject().put("success", true)
+								.put("value", f.getAbsolutePath()).toString());
+				resp.getWriter().flush();
+			} else if (s3Bucket != null) {
+				File tmp = File.createTempFile("image", ext);
+				IOUtils.copy(req.getInputStream(), new FileOutputStream(tmp));
+				Cloud.s3(s3Bucket).allowRead().upload(nextID + "." + ext, tmp);
+				resp.getWriter().write(
+						new JSONObject().put("success", true)
+								.put("value", "http://" + s3Bucket + ".s3.amazonaws.com/" + nextID + "." + ext).toString());
+				resp.getWriter().flush();
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 			resp.setStatus(resp.SC_INTERNAL_SERVER_ERROR);

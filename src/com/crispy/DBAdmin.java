@@ -103,6 +103,12 @@ public class DBAdmin extends HttpServlet {
 						columnJSON.put("destTable", cons.getDestTable());
 						columnJSON.put("destColumn", cons.getDestColumn());
 					}
+					if (type == SimpleType.FILE) {
+						columnJSON.put("folder", c.getComment().substring(c.getComment().indexOf(':') + 1));
+					}
+					if (type == SimpleType.S3) {
+						columnJSON.put("bucket", c.getComment().substring(c.getComment().indexOf(':') + 1));
+					}
 					columnsJSON.put(columnJSON);
 				}
 				data.put("columns", columnsJSON);

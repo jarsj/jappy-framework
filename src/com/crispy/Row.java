@@ -50,6 +50,20 @@ public class Row implements IJSONConvertible {
 		return columnAsString(name, c.def);
 	}
 
+	public String columnAsUrl(String name) {
+		Column c = DB.getMetadata(table).getColumn(name);
+		Object value = column(name);
+		if (value == null)
+			return null;
+		switch (c.simpleType(DB.getMetadata(table))) {
+		case FILE:
+			return "/resource/local" + value.toString();
+		case S3:
+			return value.toString();
+		}
+		return null;
+	}
+
 	public String columnAsString(String name, String def) {
 		Object o = column(name);
 		if (o instanceof String)
@@ -63,7 +77,7 @@ public class Row implements IJSONConvertible {
 			return s.substring(0, limit) + "...";
 		return s;
 	}
-	
+
 	public JSONObject columnAsJSONObject(String name) throws JSONException {
 		return new JSONObject(columnAsString(name));
 	}
@@ -152,7 +166,7 @@ public class Row implements IJSONConvertible {
 	public JSONObject toJSONObject() {
 		return new JSONObject(columns);
 	}
-	
+
 	public static JSONObject rowToJSON(Row r) throws JSONException {
 		JSONObject o = new JSONObject();
 		for (Map.Entry<String, Object> entry : r.columns.entrySet()) {
@@ -162,7 +176,7 @@ public class Row implements IJSONConvertible {
 		}
 		return o;
 	}
-	
+
 	public static JSONArray rowsToJSON(List<Row> rows) throws JSONException {
 		JSONArray ret = new JSONArray();
 		for (Row r : rows) {

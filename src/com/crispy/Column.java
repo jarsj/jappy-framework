@@ -258,7 +258,7 @@ public class Column {
 		}
 
 		if (type.startsWith("VARCHAR") && comment.length() > 0) {
-			if (comment.startsWith("file:")) {
+			if (comment.startsWith("folder:")) {
 				return SimpleType.FILE;
 			} else {
 				return SimpleType.S3;

@@ -1,6 +1,8 @@
 package com.crispy;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
@@ -88,8 +90,14 @@ public class Cloud {
 		return keys;
 	}
 
-	public Cloud upload(String key, File value) {
-		PutObjectRequest request = new PutObjectRequest(bucket, key, value);
+	public Cloud upload(String key, File value) throws FileNotFoundException {
+		ObjectMetadata metadata = new ObjectMetadata();
+		if (value.getName().endsWith("png")) {
+			metadata.setContentType("image/png");
+		} else if (value.getName().endsWith("jpg")) {
+			metadata.setContentType("image/jpg");
+		}
+		PutObjectRequest request = new PutObjectRequest(bucket, key, new FileInputStream(value), metadata);
 		if (acl != null) {
 			request = request.withAccessControlList(acl);
 		}

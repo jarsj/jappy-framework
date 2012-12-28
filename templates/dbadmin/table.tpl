@@ -66,6 +66,8 @@ $(document).ready(function() {
 							<input type="text" class="input-small" id="input${id}" name="${column.name}"><span class="help-inline">HH:MM:SS</span>
 							[#elseif column.type == "FILE"]
 							<input type="file" name="${column.name}" data-folder="${column.folder}">
+							[#elseif column.type == "S3"]
+							<input type="file" name="${column.name}" data-bucket="${column.bucket}">
 							[#elseif column.type == "REFERENCE"]
 							<input type="text" class="input-small" id="input${id}" name="${column.name}" 
 								data-source="/dbadmin/${column.destTable}/lookup?&c=${column.destColumn}" data-value="">
