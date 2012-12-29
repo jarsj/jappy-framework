@@ -17,6 +17,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
 
+import com.amazonaws.services.s3.model.Bucket;
+
 @WebServlet(urlPatterns = { "/resource", "/resource/*" })
 public class Image extends HttpServlet {
 
@@ -77,12 +79,17 @@ public class Image extends HttpServlet {
 								.put("value", f.getAbsolutePath()).toString());
 				resp.getWriter().flush();
 			} else if (s3Bucket != null) {
+				String s3Comps[] = s3Bucket.split("/");
+				
+				String bucket = s3Comps[0];
+				String parent = (s3Comps.length == 1) ? "" : (s3Comps[1] + "/");
+				
 				File tmp = File.createTempFile("image", ext);
 				IOUtils.copy(req.getInputStream(), new FileOutputStream(tmp));
-				Cloud.s3(s3Bucket).allowRead().upload(nextID + "." + ext, tmp);
+				Cloud.s3(bucket).allowRead().upload(parent + nextID + "." + ext, tmp);
 				resp.getWriter().write(
 						new JSONObject().put("success", true)
-								.put("value", "http://" + s3Bucket + ".s3.amazonaws.com/" + nextID + "." + ext).toString());
+								.put("value", "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext).toString());
 				resp.getWriter().flush();
 			}
 		} catch (Exception e) {
