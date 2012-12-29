@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.ServletException;
@@ -62,34 +63,27 @@ public class Image extends HttpServlet {
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
 		try {
-			long nextID = mID.incrementAndGet();
 			String sourceFileName = req.getHeader("X-File-Name");
 			String uploadFolder = req.getParameter("folder");
 			String s3Bucket = req.getParameter("bucket");
-			String ext = sourceFileName.substring(sourceFileName
-					.lastIndexOf('.') + 1);
 
 			if (uploadFolder != null) {
-				File folder = new File(uploadFolder);
-				folder.mkdirs();
-				File f = new File(folder, nextID + "." + ext);
-				IOUtils.copy(req.getInputStream(), new FileOutputStream(f));
 				resp.getWriter().write(
-						new JSONObject().put("success", true)
-								.put("value", f.getAbsolutePath()).toString());
+						new JSONObject()
+								.put("success", true)
+								.put("value",
+										uploadFile(uploadFolder,
+												req.getInputStream(),
+												sourceFileName)).toString());
 				resp.getWriter().flush();
 			} else if (s3Bucket != null) {
-				String s3Comps[] = s3Bucket.split("/");
-				
-				String bucket = s3Comps[0];
-				String parent = (s3Comps.length == 1) ? "" : (s3Comps[1] + "/");
-				
-				File tmp = File.createTempFile("image", ext);
-				IOUtils.copy(req.getInputStream(), new FileOutputStream(tmp));
-				Cloud.s3(bucket).allowRead().upload(parent + nextID + "." + ext, tmp);
 				resp.getWriter().write(
-						new JSONObject().put("success", true)
-								.put("value", "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext).toString());
+						new JSONObject()
+								.put("success", true)
+								.put("value",
+										uploadS3(s3Bucket,
+												req.getInputStream(),
+												sourceFileName)).toString());
 				resp.getWriter().flush();
 			}
 		} catch (Exception e) {
@@ -98,5 +92,33 @@ public class Image extends HttpServlet {
 			resp.getWriter().print("{success: false}");
 			resp.getWriter().flush();
 		}
+	}
+
+	static String uploadFile(String uploadFolder, InputStream input,
+			String fileName) throws FileNotFoundException, IOException {
+		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
+		long nextID = mID.incrementAndGet();
+		File folder = new File(uploadFolder);
+		folder.mkdirs();
+		File f = new File(folder, nextID + "." + ext);
+		IOUtils.copy(input, new FileOutputStream(f));
+		return f.getAbsolutePath().toString();
+
+	}
+
+	static String uploadS3(String s3Bucket, InputStream input, String fileName)
+			throws FileNotFoundException, IOException {
+		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
+		long nextID = mID.incrementAndGet();
+		String s3Comps[] = s3Bucket.split("/");
+
+		String bucket = s3Comps[0];
+		String parent = (s3Comps.length == 1) ? "" : (s3Comps[1] + "/");
+
+		File tmp = File.createTempFile("image", ext);
+		IOUtils.copy(input, new FileOutputStream(tmp));
+		Cloud.s3(bucket).allowRead().upload(parent + nextID + "." + ext, tmp);
+		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID
+				+ "." + ext;
 	}
 }
