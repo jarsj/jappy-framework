@@ -42,8 +42,6 @@ public class Log {
 	}
 
 	public static Log get(String name) {
-		System.out.println("Initializing new logger " + name);
-		
 		return new Log(name);
 	}
 	
