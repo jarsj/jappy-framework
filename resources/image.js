@@ -5,8 +5,7 @@ $(document).ready(
 				for ( var i = 0; i < inputs.length; i++) {
 					var input = $(inputs[i]);
 
-					if (input.attr("data-prefix")) {
-
+					if (input.attr("data-folder") || input.attr("data-bucket")) {
 						var fileUploaderElem = $("<div id='file-uploader'/>");
 						input.parent().append(fileUploaderElem);
 
@@ -17,16 +16,22 @@ $(document).ready(
 
 						input.detach();
 
+						var params = {};
+						if (input.attr("data-folder"))
+							params["folder"] = input.attr("data-folder");
+						else 
+							params["bucket"] = input.attr("data-bucket");
+						
 						var uploader = new qq.FileUploader({
 							element : fileUploaderElem[0],
-							action : "/images",
+							action : "/resource",
 							onComplete : function(id, fileName, responseJSON) {
-								hiddenInput.attr("value", input
-										.attr("data-prefix")
-										+ responseJSON.value);
+								hiddenInput.attr("value", responseJSON.value);
 							},
-							debug : true
+							debug : true,
+							params : params							
 						});
+						
 					}
 				}
 			}

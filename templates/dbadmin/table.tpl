@@ -8,7 +8,7 @@ $(document).ready(function() {
 		},
 		"bProcessing": true,
 		"bServerSide": true,
-		"sAjaxSource": "${root}/dbadmin/${table.name}/fetch",
+		"sAjaxSource": "/dbadmin/${table.name}/fetch",
 		"fnRowCallback": function( nRow, aData, iDisplayIndex ) {
               $('td:nth-child(2)', nRow).attr('nowrap','nowrap');
              return nRow;
@@ -64,11 +64,13 @@ $(document).ready(function() {
 							<input type="text" class="input-small" id="input${id}" name="${column.name}"><span class="help-inline">YYYY-MM-DD HH:MM:SS</span>
 							[#elseif column.type == "TIME"]
 							<input type="text" class="input-small" id="input${id}" name="${column.name}"><span class="help-inline">HH:MM:SS</span>
-							[#elseif column.type == "PHOTO"]
-							<input type="file" name="${column.name}" data-prefix="/images/">
+							[#elseif column.type == "FILE"]
+							<input type="file" name="${column.name}" data-folder="${column.folder}">
+							[#elseif column.type == "S3"]
+							<input type="file" name="${column.name}" data-bucket="${column.bucket}">
 							[#elseif column.type == "REFERENCE"]
 							<input type="text" class="input-small" id="input${id}" name="${column.name}" 
-								data-source="${root}/dbadmin/${column.destTable}/lookup?&c=${column.destColumn}" data-value="">
+								data-source="/dbadmin/${column.destTable}/lookup?&c=${column.destColumn}" data-value="">
 								<span class="help-inline">Start typing and select</span>							
 							[/#if]
 						</div>

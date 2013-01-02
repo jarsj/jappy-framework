@@ -1,5 +1,11 @@
 package com.crispy;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URL;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -9,7 +15,11 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collection;
 
+import javax.mail.Folder;
+
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.json.JSONObject;
 
 import com.google.common.base.Objects;
 
@@ -32,9 +42,15 @@ public class Column {
 		return type;
 	}
 
-	public static Column image(String name, int width, int height) {
+	public static Column file(String name, String folder) {
 		Column c = new Column(name, "VARCHAR(512)");
-		c.comment = width + "," + height;
+		c.comment = "folder:" + folder;
+		return c;
+	}
+
+	public static Column s3(String name, String bucket) {
+		Column c = new Column(name, "VARCHAR(512)");
+		c.comment = "s3:" + bucket;
 		return c;
 	}
 
@@ -47,7 +63,7 @@ public class Column {
 		c.def = "'" + def + "'";
 		return c;
 	}
-	
+
 	public static Column text(String name) {
 		return new Column(name, "TEXT");
 	}
@@ -79,12 +95,12 @@ public class Column {
 		Column c = new Column(name, "DATETIME");
 		return c;
 	}
-	
+
 	public static Column time(String name) {
 		Column c = new Column(name, "TIME");
 		return c;
 	}
-	
+
 	public static Column integer(String name) {
 		return new Column(name, "INT");
 	}
@@ -153,8 +169,46 @@ public class Column {
 	public Object parseObject(Object value) {
 		if (value == null)
 			return null;
-		if (type.endsWith("TEXT") || type.startsWith("VARCHAR"))
-			return value.toString();
+		if (type.endsWith("TEXT") || type.startsWith("VARCHAR")) {
+			if (comment.length() > 0) {
+				if (comment.startsWith("folder:")) {
+					String uploadFolder = comment.substring(comment.indexOf(':') + 1);
+					if (value instanceof File) {
+						try {
+							return Image.uploadFile(uploadFolder, new FileInputStream((File) value), ((File) value).getName());
+						} catch (Exception e) {
+							return null;
+						}
+					} else if (value instanceof URL) { 
+						try {
+							return Image.uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value).getPath());
+						} catch (Exception e) {
+							return null;
+						}
+					} else {
+						return value.toString();
+					}
+				} else {
+					String s3Bucket = comment.substring(comment.indexOf(':') + 1);
+					if (value instanceof File) {
+						try {
+							return Image.uploadS3(s3Bucket, new FileInputStream((File) value), ((File) value).getName());
+						} catch (Exception e) {
+							return null;
+						}
+					} else if (value instanceof URL) {
+						try {
+							return Image.uploadS3(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath());
+						} catch (Exception e) {
+							return null;
+						}
+					} else {
+						return value.toString();
+					}
+				}
+			} else
+				return value.toString();
+		}
 		if (type.equals("BIGINT")) {
 			if (value.toString().trim().length() == 0)
 				return null;
@@ -174,7 +228,7 @@ public class Column {
 				return DB.formatAsTime((java.util.Date) value);
 			throw new IllegalArgumentException("Value should be of type time");
 		}
-		
+
 		if (type.equals("DATE")) {
 			if (value instanceof String) {
 				return parseDate((String) value);
@@ -205,7 +259,7 @@ public class Column {
 					return null;
 				return new Timestamp(Long.parseLong((String) value));
 			}
-			if (value instanceof java.util.Date) 
+			if (value instanceof java.util.Date)
 				return new Timestamp(((java.util.Date) value).getTime());
 			if (value instanceof Date)
 				return new Timestamp(((Date) value).getTime());
@@ -249,8 +303,13 @@ public class Column {
 			}
 		}
 
-		if (type.startsWith("VARCHAR") && comment.length() > 0)
-			return SimpleType.PHOTO;
+		if (type.startsWith("VARCHAR") && comment.length() > 0) {
+			if (comment.startsWith("folder:")) {
+				return SimpleType.FILE;
+			} else {
+				return SimpleType.S3;
+			}
+		}
 		if (type.startsWith("VARCHAR")) {
 			String temp = type.substring(type.indexOf('(') + 1,
 					type.indexOf(')'));
@@ -277,17 +336,17 @@ public class Column {
 	public static Column bool(String name) {
 		return new Column(name, "BOOL");
 	}
-	
+
 	public static Column bool(String name, boolean def) {
 		Column c = new Column(name, "BOOL");
-		c.def = def ? "1": "0";
+		c.def = def ? "1" : "0";
 		return c;
 	}
 
 	public String getDefault() {
 		return def;
 	}
-	
+
 	private static java.util.Date parseDate(String value) {
 		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
 		try {
@@ -296,8 +355,8 @@ public class Column {
 			return null;
 		}
 	}
-	
-	private  static java.util.Date parseTime(String value) {
+
+	private static java.util.Date parseTime(String value) {
 		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
 		try {
 			return format.parse(value);
@@ -305,7 +364,7 @@ public class Column {
 			return null;
 		}
 	}
-	
+
 	public static java.util.Date parseDateTime(String value) {
 		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:MM:SS");
 		try {

@@ -96,7 +96,6 @@ public class DBTest {
 				Column.date("release_date"),//
 				Column.integer("runtime"),//
 				Column.text("description", 512),//
-				Column.image("photo", 100, 80),//
 				Column.bigInteger("collection"), //
 				Column.bigInteger("id", true)).create();
 
