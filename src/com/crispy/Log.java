@@ -21,7 +21,7 @@ public class Log {
 	private static String DEFAULT_FOLDER;
 	private static boolean DEFAULT_CONSOLE;
 	private static Level DEFAULT_LEVEL;
-	
+
 	private String name;
 	private Logger logger;
 	private String prefix;
@@ -44,15 +44,20 @@ public class Log {
 	public static Log get(String name) {
 		return new Log(name);
 	}
-	
+
 	public static void globalFile(String folder) {
-		DEFAULT_FOLDER = folder;
+		try {
+			if (new File(folder).mkdirs()) {
+				DEFAULT_FOLDER = folder;
+			}
+		} catch (Throwable t) {
+		}
 	}
-	
+
 	public static void globalConsole() {
 		DEFAULT_CONSOLE = true;
 	}
-	
+
 	public Log file(String folder) {
 		return file(folder, Priority.DEBUG);
 	}
@@ -85,7 +90,7 @@ public class Log {
 	public Log console() {
 		return console(Priority.DEBUG);
 	}
-	
+
 	public Log console(Priority p) {
 		logger.removeAppender("jappy-console");
 		ConsoleAppender console = new ConsoleAppender();
@@ -99,7 +104,7 @@ public class Log {
 	}
 
 	public Log email(String to, Priority p) {
-		
+
 		EC2SMTPAppender email = new EC2SMTPAppender(to);
 		email.setName("jappy-email");
 		email.activateOptions();
@@ -107,7 +112,7 @@ public class Log {
 		logger.addAppender(email);
 		return this;
 	}
-	
+
 	public Log prefix(String p) {
 		this.prefix = p;
 		this.prefix += " ";
@@ -121,7 +126,7 @@ public class Log {
 	public void error(String message) {
 		logger.error(prefix + message);
 	}
-	
+
 	public void error(String message, Throwable t) {
 		logger.error(prefix + message, t);
 	}

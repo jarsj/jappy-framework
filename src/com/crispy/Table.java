@@ -101,7 +101,7 @@ public class Table {
 		}
 	}
 
-	private static final Log LOG = Log.get("db").file("/mnt/logs");
+	private static final Log LOG = Log.get("db");
 
 	private ArrayList<Table> joins;
 
