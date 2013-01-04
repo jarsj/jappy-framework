@@ -18,7 +18,7 @@ import org.apache.log4j.Priority;
  */
 public class Log {
 
-	private static String DEFAULT_FOLDER;
+	private static String DEFAULT_FOLDER = "/mnt/logs";
 	private static boolean DEFAULT_CONSOLE;
 	private static Level DEFAULT_LEVEL;
 
@@ -66,16 +66,18 @@ public class Log {
 		logger.removeAppender("jappy-file");
 		File ff = new File(folder);
 		if (!ff.exists()) {
-			ff.mkdir();
+			ff.mkdirs();
 		}
 		try {
-			DailyRollingFileAppender appender = new DailyRollingFileAppender(
-					new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"), new File(
-							folder + "/" + name).getAbsolutePath(),
-					"dd-MM-yyyy");
-			appender.setName("jappy-file");
-			appender.setThreshold(p);
-			logger.addAppender(appender);
+			if (ff.exists() && ff.isDirectory()) {
+				DailyRollingFileAppender appender = new DailyRollingFileAppender(
+						new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"),
+						new File(folder + "/" + name).getAbsolutePath(),
+						"dd-MM-yyyy");
+				appender.setName("jappy-file");
+				appender.setThreshold(p);
+				logger.addAppender(appender);
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -29,6 +29,7 @@ package com.crispy;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URISyntaxException;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.ConsoleAppender;
@@ -65,6 +66,10 @@ public class EC2SMTPAppender extends ConsoleAppender {
 						+ ":" + event.getMessage());
 				String body = event.getMessage() + "\n" + "Thread Name : "
 						+ event.getThreadName() + "\n\n";
+				try {
+					body = body + EC2SMTPAppender.class.getProtectionDomain().getCodeSource().getLocation().toURI().toASCIIString();
+				} catch (Throwable t) {
+				}
 
 				if (event.getThrowableInformation() != null) {
 					if (event.getThrowableInformation().getThrowable() != null) {
