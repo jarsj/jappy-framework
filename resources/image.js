@@ -17,19 +17,21 @@ $(document).ready(
 						input.detach();
 
 						var params = {};
-						if (input.attr("data-folder"))
+						if (input.attr("data-folder")) 
 							params["folder"] = input.attr("data-folder");
 						else 
 							params["bucket"] = input.attr("data-bucket");
+						
 						
 						var uploader = new qq.FileUploader({
 							element : fileUploaderElem[0],
 							action : "/resource",
 							onComplete : function(id, fileName, responseJSON) {
-								hiddenInput.attr("value", responseJSON.value);
+								this.hiddenInput.attr("value", responseJSON.value);
 							},
 							debug : true,
-							params : params							
+							params : params,
+							hiddenInput : hiddenInput
 						});
 						
 					}
