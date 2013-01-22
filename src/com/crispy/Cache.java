@@ -1,5 +1,6 @@
 package com.crispy;
 
+import java.sql.SQLException;
 import java.sql.Timestamp;
 
 public class Cache {
@@ -54,6 +55,10 @@ public class Cache {
 		DB.updateQuery(
 				"INSERT INTO `cache`(`key`, `value`, `expires`) VALUES (?,?,?)",
 				key, value, new Timestamp(expire));
+	}
+	
+	public void remove(String key) throws Exception {
+		Table.get("cache").where("key", key).delete();
 	}
 
 	public void store(String key, String value, Expire e) throws Exception {
