@@ -104,7 +104,7 @@ public class Job {
 		return headers;
 	}
 
-	public static void setITunesHeaders(Job j, String storeId) {
+	public static void setITunes9Headers(Job j, String storeId) {
 		j.setHeader("Host", "itunes.apple.com");
 		j.setHeader("Accept-Language", "en-us, en;q=0.50");
 		j.setHeader("X-Apple-Store-Front", storeId);
@@ -114,6 +114,10 @@ public class Job {
 
 	}
 
+	public static void setITunes11Headers(Job j, String storeId) {
+		j.setHeader("Host", "client-api.itunes.apple.com");
+	}
+	
 	public void setUserAgent(String string) {
 		this.ua = string;
 	}
