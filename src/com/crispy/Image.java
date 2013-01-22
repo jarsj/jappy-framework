@@ -14,11 +14,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
-
-import com.amazonaws.services.s3.model.Bucket;
 
 @WebServlet(urlPatterns = { "/resource", "/resource/*" })
 public class Image extends HttpServlet {
