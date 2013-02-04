@@ -22,7 +22,6 @@ import org.json.JSONObject;
 
 import com.crispy.Table.WhereOp;
 
-
 @WebServlet("/dbadmin/*")
 public class DBAdmin extends HttpServlet {
 
@@ -34,7 +33,7 @@ public class DBAdmin extends HttpServlet {
 				resp.sendRedirect("dbadmin/");
 				return;
 			}
-			
+
 			String path[] = req.getPathInfo().split("/");
 			if (path.length == 3 && path[2].equals("delete")) {
 				String table = path[1];
@@ -49,16 +48,18 @@ public class DBAdmin extends HttpServlet {
 				String table = path[1];
 				String c = req.getParameter("c");
 				Metadata m = DB.getMetadata(table);
-				
+
 				if (m.getDisplay() == null) {
-					throw new IllegalStateException("This table has no display configured. Don't lookup");
+					throw new IllegalStateException(
+							"This table has no display configured. Don't lookup");
 				}
 
 				JSONArray ret = new JSONArray();
 				List<Row> rows = Table
 						.get(table)
 						.columns(c, m.getDisplay())
-						.where(m.getDisplay(), "%" + req.getParameter("term") + "%",
+						.where(m.getDisplay(),
+								"%" + req.getParameter("term") + "%",
 								WhereOp.LIKE).limit(10).rows();
 				for (Row r : rows) {
 					String display = r.display();
@@ -91,7 +92,8 @@ public class DBAdmin extends HttpServlet {
 				for (Column c : m.getColumns()) {
 					if (c.isAutoIncrement())
 						continue;
-					if (c.getType().equals("TIMESTAMP") && c.getDefault() != null)
+					if (c.getType().equals("TIMESTAMP")
+							&& c.getDefault() != null)
 						continue;
 					SimpleType type = c.simpleType(m);
 
@@ -104,10 +106,16 @@ public class DBAdmin extends HttpServlet {
 						columnJSON.put("destColumn", cons.getDestColumn());
 					}
 					if (type == SimpleType.FILE) {
-						columnJSON.put("folder", c.getComment().substring(c.getComment().indexOf(':') + 1));
+						columnJSON.put(
+								"folder",
+								c.getComment().substring(
+										c.getComment().indexOf(':') + 1));
 					}
 					if (type == SimpleType.S3) {
-						columnJSON.put("bucket", c.getComment().substring(c.getComment().indexOf(':') + 1));
+						columnJSON.put(
+								"bucket",
+								c.getComment().substring(
+										c.getComment().indexOf(':') + 1));
 					}
 					columnsJSON.put(columnJSON);
 				}
@@ -119,10 +127,12 @@ public class DBAdmin extends HttpServlet {
 							Utils.arrayToJSON(Arrays.asList(columns(m, 6))));
 					out.write(Template.expand("class:dbadmin/table.tpl", data));
 				} else if (path.length == 3) {
-					String c = req.getParameter("c");
-					String v = req.getParameter("v");
-
-					if (path[2].equals("edit")) {
+					if (path[2].equals("add")) {
+						out.write(Template.expand("class:dbadmin/add.tpl",
+								data));
+					} else if (path[2].equals("edit")) {
+						String c = req.getParameter("c");
+						String v = req.getParameter("v");
 
 						data.put("primaryColumn", c);
 						data.put("primaryValue", v);
@@ -146,8 +156,8 @@ public class DBAdmin extends HttpServlet {
 										row.columnAsString(col.getName()));
 								break;
 							case DATETIME:
-								rowJSON.put(col.getName(), 
-										row.dateAsString(col.getName(), "yyyy-MM-dd HH:mm:ss"));
+								rowJSON.put(col.getName(), row.dateAsString(
+										col.getName(), "yyyy-MM-dd HH:mm:ss"));
 								break;
 							case DATE:
 								rowJSON.put(col.getName(), row.dateAsString(
@@ -158,7 +168,8 @@ public class DBAdmin extends HttpServlet {
 										row.columnAsString(col.getName()));
 								Constraint cons = m
 										.getConstraint(col.getName());
-								Metadata dstMeta = DB.getMetadata(cons.getDestTable());
+								Metadata dstMeta = DB.getMetadata(cons
+										.getDestTable());
 								Row remote = Table
 										.get(cons.getDestTable())
 										.where(cons.getDestColumn(),
@@ -167,8 +178,9 @@ public class DBAdmin extends HttpServlet {
 								if (remote == null) {
 									remoteJSON.put(col.getName(), "");
 								} else {
-									remoteJSON.put(col.getName(), StringEscapeUtils
-											.escapeHtml(remote.display()));
+									remoteJSON.put(col.getName(),
+											StringEscapeUtils.escapeHtml(remote
+													.display()));
 								}
 								break;
 							}
@@ -176,7 +188,8 @@ public class DBAdmin extends HttpServlet {
 						data.put("row", rowJSON);
 						data.put("remote", remoteJSON);
 
-						out.write(Template.expand("class:dbadmin/edit.tpl", data));
+						out.write(Template.expand("class:dbadmin/edit.tpl",
+								data));
 					}
 
 				}
@@ -226,8 +239,8 @@ public class DBAdmin extends HttpServlet {
 		}
 
 		/**
-		 * Note we can only search display columns. If no display column is configured, we 
-		 * can't search. Ideally show this in the UI.
+		 * Note we can only search display columns. If no display column is
+		 * configured, we can't search. Ideally show this in the UI.
 		 */
 		if (sSearch != null && m.getDisplay() != null) {
 			t = t.where(m.getDisplay(), sSearch + "%", WhereOp.LIKE);
@@ -241,7 +254,7 @@ public class DBAdmin extends HttpServlet {
 		ret.put("iTotalDisplayRecords", rows.size());
 
 		JSONArray data = new JSONArray();
-		
+
 		for (Row r : rows) {
 			JSONArray rowJSON = new JSONArray();
 			for (String column : previewColumns) {

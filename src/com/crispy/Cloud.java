@@ -128,12 +128,4 @@ public class Cloud {
 		}
 		return this;
 	}
-
-	public static void main(String[] args) throws Exception {
-		Cloud.init("16ZY7NJB3DZYTPK9T6R2", "YMxgM89oOxFBrmmvLET625MX5A4oHfmHQ1Z0R2/Y");
-				
-		Cloud.s3("crispy-jappy").allowRead()
-				.upload("chatpat/full/369.jpg",
-						"http://upload.wikimedia.org/wikipedia/en/thumb/5/5d/Cocktail_2012_poster.jpg/220px-Cocktail_2012_poster.jpg");
-	}
 }

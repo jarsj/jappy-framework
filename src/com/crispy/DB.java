@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.dbcp.BasicDataSource;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class DB {
@@ -26,11 +27,14 @@ public class DB {
 	private ConcurrentHashMap<String, Metadata> tables;
 	private static DB INSTANCE = new DB();
 	private static Log LOG = Log.get("db");
-	
-	public static void init(String database, String user, String password)
-			throws SQLException {
+
+	public static void init(String database, String user, String password) {
 		if (INSTANCE.mDS != null) {
-			INSTANCE.mDS.close();
+			try {
+				INSTANCE.mDS.close();
+			} catch (Throwable t) {
+				LOG.warn("Connection might not have been closed. Potential leak");
+			}
 		}
 		INSTANCE.database = database;
 		BasicDataSource bds = new BasicDataSource();
@@ -41,8 +45,11 @@ public class DB {
 		bds.setTestOnBorrow(true);
 		bds.setValidationQuery("SELECT 1");
 		INSTANCE.mDS = bds;
-		
-		Table.get("_metadata").columns(Column.text("table", 100), Column.mediumtext("metadata")).primary("table").create();		
+
+		Table.get("_metadata")
+				.columns(Column.text("table", 100),
+						Column.mediumtext("metadata")).primary("table")
+				.create();
 	}
 
 	public static void shutdown() {
@@ -73,13 +80,25 @@ public class DB {
 			ResultSet results = meta.getTables(null, null, table, null);
 			if (results.next()) {
 				tableExists = true;
-				try {
-					m.comment = new JSONObject(Table.get("_metadata").where("table", table).row().columnAsString("metadata"));
-				} catch (Exception e) {
-					m.comment = new JSONObject();
+				if (!table.equals("_metadata")) {
+					Row commentRow = Table.get("_metadata").where("table", table).row();
+					String comment = null;
+					if (commentRow != null) {
+						comment = commentRow.columnAsString("metadata");
+					}
+					if (comment != null) {
+						try {
+							m.comment = new JSONObject(comment);
+						} catch (JSONException e) {
+							m.comment = new JSONObject();
+						}
+					}
+					else 
+						m.comment = new JSONObject();
 				}
+
 			}
-			
+
 			if (tableExists) {
 				// First let's load columns.
 				results = meta.getColumns(null, null, table, null);
@@ -168,8 +187,8 @@ public class DB {
 		}
 	}
 
-	public static Object singleItemQuery(Connection con, String sql, Object... args)
-			throws SQLException {
+	public static Object singleItemQuery(Connection con, String sql,
+			Object... args) throws SQLException {
 		PreparedStatement pstmt = con.prepareStatement(sql);
 		for (int i = 0; i < args.length; i++) {
 			pstmt.setObject(i + 1, args[i]);
@@ -193,12 +212,12 @@ public class DB {
 		pstmt.close();
 	}
 
-	public static void updateQuery(String sql, Object... args) throws SQLException {
+	public static void updateQuery(String sql, Object... args)
+			throws SQLException {
 		Connection con = getConnection();
 		try {
 			updateQuery(con, sql, args);
-		} 
-		finally {
+		} finally {
 			con.close();
 		}
 	}
@@ -234,17 +253,17 @@ public class DB {
 			return null;
 		return ret;
 	}
-	
+
 	public static String formatAsDateTime(java.sql.Date d) {
 		return formatAsDateTime(new Date(d.getTime()));
 	}
-	
+
 	public static String formatAsDate(Calendar c) {
 		return formatAsDate(c.getTime());
 	}
 
 	public static String formatAsDate(Timestamp t) {
-		return formatAsDate(new Date(t.getTime())); 
+		return formatAsDate(new Date(t.getTime()));
 	}
 
 	public static String formatAsDate(java.sql.Date day) {
@@ -258,7 +277,7 @@ public class DB {
 			return null;
 		return ret;
 	}
-	
+
 	public static String formatAsTime(Date d) {
 		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
 		String ret = format.format(d);

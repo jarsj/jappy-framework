@@ -90,17 +90,12 @@ public class Log {
 	}
 
 	public Log console() {
-		return console(Priority.DEBUG);
-	}
-
-	public Log console(Priority p) {
 		logger.removeAppender("jappy-console");
 		ConsoleAppender console = new ConsoleAppender();
 		console.setName("jappy-console");
 		console.setLayout(new PatternLayout(
 				"%d{ISO8601} [%t] %-5p %c %x - %m%n"));
 		console.activateOptions();
-		console.setThreshold(p);
 		logger.addAppender(console);
 		return this;
 	}

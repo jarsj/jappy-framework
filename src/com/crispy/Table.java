@@ -759,6 +759,8 @@ public class Table {
 
 	public Table where(String column, Object value, WhereOp op) {
 		Metadata m = DB.getMetadata(name);
+		if (m == null)
+			throw new IllegalStateException("No table exists for " + name);
 		Column c = Column.findByName(m.columns, column);
 		if (c == null) {
 			throw new IllegalStateException("No column exists for " + column + " in table " + name);
