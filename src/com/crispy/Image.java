@@ -15,6 +15,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
 import org.json.JSONObject;
 
 @WebServlet(urlPatterns = { "/resource", "/resource/*" })
@@ -110,11 +112,12 @@ public class Image extends HttpServlet {
 		String s3Comps[] = s3Bucket.split("/");
 
 		String bucket = s3Comps[0];
-		String parent = (s3Comps.length == 1) ? "" : (s3Comps[1] + "/");
+		s3Comps = (String[]) ArrayUtils.remove(s3Comps, 0);
+		String parent = (s3Comps.length == 0) ? "" : (StringUtils.join(s3Comps, "/") + "/");
 
 		File tmp = File.createTempFile("image", ext);
 		IOUtils.copy(input, new FileOutputStream(tmp));
-		Cloud.s3(bucket).allowRead().upload(parent + nextID + "." + ext, tmp);
+		Cloud.s3(bucket).create().allowRead().upload(parent + nextID + "." + ext, tmp);
 		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID
 				+ "." + ext;
 	}

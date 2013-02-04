@@ -22,6 +22,8 @@
 						<input type="text" class="input-small" id="input${id}" name="${column.name}" value=""><span class="help-inline">YYYY-MM-DD</span>							
 						[#elseif column.type == "FILE"]
 						<input type="file" name="${column.name}" data-folder="${column.folder}" data-value="">
+						[#elseif column.type == "S3"]
+						<input type="file" name="${column.name}" data-bucket="${column.bucket}" data-value="">
 						[#elseif column.type == "REFERENCE"]
 						<input type="text" class="input-small" id="input${id}" name="${column.name}" 
 							data-source="/dbadmin/${column.destTable}/lookup?c=${column.destColumn}" 
