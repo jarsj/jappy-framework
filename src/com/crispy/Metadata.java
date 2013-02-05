@@ -7,11 +7,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import com.google.common.base.Objects;
 
 public class Metadata {
 	String name;
@@ -108,7 +108,44 @@ public class Metadata {
 			return false;
 		return !(comment.optBoolean("no-data-entry", false));
 	}
-		
+	
+	/**
+	 * Admin columns must contain primary column.
+	 * 
+	 * @return
+	 */
+	public String[] adminColumns() {
+		ArrayList<String> ret = new ArrayList<String>();
+		final String primary = getPrimary().getColumn(0);
+		ret.add(primary);
+		String admin = comment.optString("admin", null);
+		if (admin == null) {
+			int c = 0;
+			while (ret.size() < 5 && c < columns.size()) {
+				if (columns.get(c).name.equals(primary)) {
+					c++;
+					continue;
+				}
+				ret.add(columns.get(c).name);
+				c++;
+			}
+		} else {
+			String[] admins = StringUtils.split(admin, ",");
+			for (Column c : columns) {
+				if (c.getName().equals(primary))
+					continue;
+				if (ArrayUtils.contains(admins, c.getName()))
+					ret.add(c.getName());
+			}
+		}
+		return ret.toArray(new String[]{});
+	}
+	
+	public void setAdminColumns(String[] cols) throws Exception {
+		comment.put("admin", StringUtils.join(cols, ","));
+		Table.get("_metadata").columns("metadata").values(comment.toString()).where("table", name).update();
+	}
+	
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();

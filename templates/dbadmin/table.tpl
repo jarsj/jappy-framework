@@ -25,14 +25,17 @@ $(document).ready(function() {
 	</div>
 	[/#if]
 	<div class="page-header">
+		<a class="pull-right btn btn-success" style="margin-left : 10px;" href="/dbadmin/${table.name}/settings"><i class="icon-cog icon-white"></i>Settings</a>
 		<a class="pull-right btn btn-success" href="/dbadmin/${table.name}/add"><i class="icon-plus-sign icon-white"></i>Add</a>
 		<h1>${table.name}</h1>
 	</div>
 	<table class="table-striped table-bordered table" id="maintable">
 		<thead>
 			<tr>
-				[#list preview as column]
-				<th>${column}</th>
+				[#list columns as column]
+				[#if column.admin]
+				<th>${column.name}</th>
+				[/#if]
 				[/#list]
 				<th>Action</th>
 			</tr>

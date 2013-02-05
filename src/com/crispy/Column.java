@@ -277,6 +277,12 @@ public class Column {
 				return null;
 			return Integer.parseInt(value.toString().trim());
 		}
+		if (type.equals("BOOL")) {
+			if (value.toString().trim().length() == 0)
+				return null;
+			return Boolean.parseBoolean(value.toString().trim());
+		}
+		
 		return value;
 	}
 

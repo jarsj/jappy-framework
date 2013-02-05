@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
@@ -262,11 +263,15 @@ public class Table {
 				}
 
 				if (!m.comment.toString().equals(comment.toString())) {
+					JSONObject merged = new JSONObject(m.comment.toString());
+					Iterator<String> keys = comment.keys();
+					while (keys.hasNext()) {
+						String key = keys.next();
+						merged.put(key, comment.get(key));
+					}
 					Table.get("_metadata").columns("table", "metadata")
-							.values(name, comment.toString())
+							.values(name, merged.toString())
 							.overwrite("metadata").add();
-					DB.updateQuery("ALTER TABLE `" + name + "` COMMENT=?",
-							comment.toString());
 				}
 			}
 

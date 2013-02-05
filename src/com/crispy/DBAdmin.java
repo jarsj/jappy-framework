@@ -15,7 +15,10 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.enums.EnumUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -86,20 +89,18 @@ public class DBAdmin extends HttpServlet {
 				String table = path[1];
 				addTable(data, table);
 				Metadata m = DB.getMetadata(table);
-				String columns[] = m.columnNames();
+				String admin[] = m.adminColumns();
 
 				JSONArray columnsJSON = new JSONArray();
 				for (Column c : m.getColumns()) {
-					if (c.isAutoIncrement())
-						continue;
-					if (c.getType().equals("TIMESTAMP")
-							&& c.getDefault() != null)
-						continue;
 					SimpleType type = c.simpleType(m);
 
 					JSONObject columnJSON = new JSONObject();
 					columnJSON.put("name", c.getName());
 					columnJSON.put("type", type.toString());
+					columnJSON.put("admin",
+							ArrayUtils.contains(admin, c.getName()));
+					columnJSON.put("auto", c.isAutoIncrement());
 					if (type == SimpleType.REFERENCE) {
 						Constraint cons = m.getConstraint(c.getName());
 						columnJSON.put("destTable", cons.getDestTable());
@@ -123,12 +124,13 @@ public class DBAdmin extends HttpServlet {
 
 				if (path.length == 2) {
 					data.put("primaryColumn", m.getPrimary().getColumn(0));
-					data.put("preview",
-							Utils.arrayToJSON(Arrays.asList(columns(m, 6))));
 					out.write(Template.expand("class:dbadmin/table.tpl", data));
 				} else if (path.length == 3) {
 					if (path[2].equals("add")) {
-						out.write(Template.expand("class:dbadmin/add.tpl",
+						out.write(Template
+								.expand("class:dbadmin/add.tpl", data));
+					} else if (path[2].equals("settings")) {
+						out.write(Template.expand("class:dbadmin/settings.tpl",
 								data));
 					} else if (path[2].equals("edit")) {
 						String c = req.getParameter("c");
@@ -202,18 +204,6 @@ public class DBAdmin extends HttpServlet {
 		}
 	}
 
-	private String[] columns(Metadata m, int N) {
-		ArrayList<String> columns = new ArrayList<String>();
-		columns.add(m.getPrimary().getColumn(0));
-		String[] temp = m.columnNames();
-		for (int i = 0; i < temp.length && columns.size() < N; i++) {
-			if (temp[i].equals(m.getPrimary().getColumn(0)))
-				continue;
-			columns.add(temp[i]);
-		}
-		return columns.toArray(new String[] {});
-	}
-
 	private JSONObject fetch(String table, HttpServletRequest req)
 			throws NumberFormatException, JSONException, SQLException {
 		Metadata m = DB.getMetadata(table);
@@ -222,7 +212,7 @@ public class DBAdmin extends HttpServlet {
 		if (sSearch != null && sSearch.trim().length() == 0)
 			sSearch = null;
 
-		String[] previewColumns = columns(m, iColumns - 1);
+		String[] previewColumns = m.adminColumns();
 
 		Table t = Table.get(table).columns(previewColumns)
 				.start(Integer.parseInt(req.getParameter("iDisplayStart")))
@@ -361,6 +351,18 @@ public class DBAdmin extends HttpServlet {
 						+ e.getMessage());
 				return;
 			}
+		} else if (path[2].equals("settings")) {
+			try {
+				m.setAdminColumns(Collections.list(req.getParameterNames())
+						.toArray(new String[] {}));
+				resp.sendRedirect(req.getContextPath() + "/dbadmin/" + table
+						+ "/settings");
+			} catch (Exception e) {
+				e.printStackTrace();
+				resp.sendRedirect(req.getContextPath() + "/dbadmin/" + table
+						+ "/settings?error=" + e.getMessage());
+			}
+
 		}
 	}
 

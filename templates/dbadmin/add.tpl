@@ -7,6 +7,8 @@
 			<fieldset>
 				[#assign id = 0]
 				[#list columns as column]
+					[#if !column.auto]
+					
 					[#assign id = id + 1]
 				<div class="control-group">
 					<label class="control-label" for="input${id}">${column.name}</label>
@@ -33,6 +35,7 @@
 						[/#if]
 					</div>
 				</div>
+					[/#if]
 				[/#list]
 				<div class="form-actions">
            			<button type="submit" class="btn btn-primary">Save changes</button>
