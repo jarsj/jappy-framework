@@ -51,10 +51,7 @@ public class Cache {
 	public void store(String key, String value, long expire) throws Exception {
 		if (expire == 0)
 			return;
-		DB.updateQuery("DELETE FROM `cache` WHERE `key`=?", key);
-		DB.updateQuery(
-				"INSERT INTO `cache`(`key`, `value`, `expires`) VALUES (?,?,?)",
-				key, value, new Timestamp(expire));
+		Table.get("cache").columns("key", "value", "expires").values(key, value, expire).overwrite("value", "expires").add();
 	}
 	
 	public void remove(String key) throws Exception {

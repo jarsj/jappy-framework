@@ -4,11 +4,15 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeSet;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -16,41 +20,71 @@ import org.json.JSONObject;
 
 public class Row implements IJSONConvertible {
 	private HashMap<String, Object> columns;
-	private String table;
-
+	private HashMap<String, LinkedList<String>> columnToTableIndex;
+	private TreeSet<String> tables;
+			
 	protected Row(ResultSet results) throws SQLException {
 		columns = new HashMap<String, Object>();
+		columnToTableIndex = new HashMap<String, LinkedList<String>>();
+		tables = new TreeSet<String>();
 		ResultSetMetaData meta = results.getMetaData();
 		for (int c = 0; c < meta.getColumnCount(); c++) {
-			table = meta.getTableName(c + 1);
+			String table = meta.getTableName(c + 1);
+			String column = meta.getColumnName(c + 1);
 			columns.put(
-					meta.getTableName(c + 1) + "." + meta.getColumnName(c + 1),
+					table + "." + column,
 					results.getObject(c + 1));
+			tables.add(table);
+			LinkedList<String> myTables = columnToTableIndex.get(column);
+			if (myTables == null) {
+				myTables = new LinkedList<String>();
+				columnToTableIndex.put(column, myTables);
+			}
+			myTables.add(table);
 		}
 	}
-
+	
 	public String display() {
-		Metadata m = DB.getMetadata(table);
+		Metadata m = DB.getMetadata(tables.first());
 		if (m.getDisplay() == null)
 			return columnAsString(m.columns.get(0).getName());
 		return columnAsString(m.getDisplay());
 	}
 
+	private String getTable(String name) {
+		LinkedList<String> tables = columnToTableIndex.get(name);
+		if (tables == null)
+			throw new IllegalArgumentException("Column does not exist");
+		if (tables.size() > 1)
+			throw new IllegalArgumentException("Multiple tables exist");
+		return tables.getFirst();
+	}
+	
 	public Object column(String name) {
+		return column(getTable(name), name);
+	}
+	
+	public Object column(String table, String name) {
 		return columns.get(table + "." + name);
 	}
 
-	public Row table(String table) {
-		this.table = table;
-		return this;
-	}
-
 	public String columnAsString(String name) {
+		return columnAsString(getTable(name), name);
+	}
+	
+	public String columnAsString(String table, String name) {
 		Column c = DB.getMetadata(table).getColumn(name);
-		return columnAsString(name, c.def);
+		Object o = column(table, name);
+		if (o instanceof String)
+			return (String) o;
+		return (o != null) ? o.toString() : c.def;
 	}
 
 	public String columnAsUrl(String name) {
+		return columnAsUrl(getTable(name), name);
+	}
+	
+	public String columnAsUrl(String table, String name) {
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object value = column(name);
 		if (value == null)
@@ -64,30 +98,12 @@ public class Row implements IJSONConvertible {
 		return null;
 	}
 
-	public String columnAsString(String name, String def) {
-		Object o = column(name);
-		if (o instanceof String)
-			return (String) o;
-		return (o != null) ? o.toString() : def;
-	}
-
-	public String columnAsString(String name, String def, int limit) {
-		String s = columnAsString(name, def);
-		if (s.length() > limit)
-			return s.substring(0, limit) + "...";
-		return s;
-	}
-
 	public JSONObject columnAsJSONObject(String name) throws JSONException {
 		return new JSONObject(columnAsString(name));
 	}
 
-	public String columnAsString(String name, int limit) {
-		return columnAsString(name, "", limit);
-	}
-
-	public String moneyAsString(String name, String currency) {
-		long money = columnAsLong(name);
+	public String moneyAsString(String table, String name, String currency) {
+		long money = columnAsLong(table, name);
 		if (currency.equals("USD")) {
 			if (money == 0)
 				return "";
@@ -110,8 +126,8 @@ public class Row implements IJSONConvertible {
 		throw new IllegalStateException("Currency not supported");
 	}
 
-	public String dateAsString(String name, String format) {
-		Object o = column(name);
+	public String dateAsString(String table, String name, String format) {
+		Object o = column(table, name);
 		if (o instanceof java.sql.Date) {
 			java.sql.Date d = (java.sql.Date) o;
 			SimpleDateFormat sdf = new SimpleDateFormat(format);
@@ -122,8 +138,8 @@ public class Row implements IJSONConvertible {
 		return o.toString();
 	}
 
-	public long columnAsLong(String name) {
-		Object o = column(name);
+	public long columnAsLong(String table, String name) {
+		Object o = column(table, name);
 		if (o == null)
 			return 0;
 		if (o instanceof Number)
@@ -131,15 +147,15 @@ public class Row implements IJSONConvertible {
 		return Long.parseLong(o.toString());
 	}
 
-	public int columnAsInt(String name) {
-		Object o = column(name);
+	public int columnAsInt(String table, String name) {
+		Object o = column(table, name);
 		if (o instanceof Number)
 			return ((Number) o).intValue();
 		return Integer.parseInt(o.toString());
 	}
 
-	public boolean columnAsBool(String name) {
-		Object o = column(name);
+	public boolean columnAsBool(String table, String name) {
+		Object o = column(table, name);
 		if (o instanceof Boolean)
 			return (Boolean) o;
 		if (o instanceof Number) {
@@ -148,8 +164,8 @@ public class Row implements IJSONConvertible {
 		return o != null;
 	}
 
-	public int columnAsInt(String name, int def) {
-		Object o = column(name);
+	public int columnAsInt(String table, String name, int def) {
+		Object o = column(table, name);
 		if (o == null)
 			return def;
 		if (o instanceof Number)
@@ -157,8 +173,8 @@ public class Row implements IJSONConvertible {
 		return Integer.parseInt(o.toString());
 	}
 
-	public Date columnAsDate(String name) {
-		java.sql.Date sqlDate = (java.sql.Date) column(name);
+	public Date columnAsDate(String table, String name) {
+		java.sql.Date sqlDate = (java.sql.Date) column(table, name);
 		return new Date(sqlDate.getTime());
 	}
 
@@ -183,5 +199,17 @@ public class Row implements IJSONConvertible {
 			ret.put(rowToJSON(r));
 		}
 		return ret;
+	}
+
+	public int columnAsInt(String name) {
+		return columnAsInt(getTable(name), name);
+	}
+
+	public long columnAsLong(String name) {
+		return columnAsLong(getTable(name), name);
+	}
+
+	public String dateAsString(String name, String format) {
+		return dateAsString(getTable(name), name, format);
 	}
 }

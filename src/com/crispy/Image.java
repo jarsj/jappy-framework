@@ -22,12 +22,14 @@ import org.json.JSONObject;
 @WebServlet(urlPatterns = { "/resource", "/resource/*" })
 public class Image extends HttpServlet {
 
+	private static final Log LOG = Log.get("resource");
 	private static AtomicLong mID = new AtomicLong(System.currentTimeMillis());
 
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
 		String fileName = req.getPathInfo();
+		LOG.info(fileName);
 		if (fileName.startsWith("/class")) {
 			doClass(fileName.substring(fileName.indexOf('/', 1)), resp);
 		} else if (fileName.startsWith("/local")) {
@@ -37,6 +39,7 @@ public class Image extends HttpServlet {
 
 	private void doClass(String path, HttpServletResponse resp)
 			throws IOException {
+		LOG.info(path);
 		IOUtils.copy(getClass().getResourceAsStream(path),
 				resp.getOutputStream());
 		resp.getOutputStream().flush();

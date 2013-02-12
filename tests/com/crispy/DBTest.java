@@ -23,8 +23,7 @@ public class DBTest {
 
 	@Test
 	public void checkTableMetadata() throws SQLException {
-		DB.updateQuery(
-				"CREATE TABLE `test` (`name` VARCHAR(100))");
+		DB.updateQuery("CREATE TABLE `test` (`name` VARCHAR(100))");
 		DB.updateQuery("ALTER TABLE `test` ADD INDEX (`name`)");
 
 		DB.loadMetadata("test");
@@ -49,6 +48,7 @@ public class DBTest {
 		Table.get("movie").columns(//
 				Column.bigInteger("id", true), //
 				Column.text("name", 200), //
+				Column.text("description", 200),
 				Column.bigInteger("director")).indexes(Index.create("name"))
 				.constraints(Constraint.create("director", "celebrity", "id"))
 				.display("name").create();
@@ -60,15 +60,22 @@ public class DBTest {
 
 		Table.get("celebrity").columns("name").values("Harsh").add();
 		long id = Table.get("celebrity").columns("id").row().columnAsLong("id");
-		Table.get("movie").columns("name", "director").values("Love You", id)
+		Table.get("movie").columns("name", "description", "director").values("Love You", "What is good", id)
 				.add();
 
-		Row r = Table.get("movie").columns("name")
+		Row r = Table.get("movie").columns("name", "description")
 				.join(Table.get("celebrity").columns("name")).row();
-
-		Assert.assertEquals(r.table("movie").columnAsString("name"), "Love You");
-		Assert.assertEquals(r.table("celebrity").columnAsString("name"),
-				"Harsh");
+		
+		try {
+			r.columnAsString("name");
+			Assert.fail("Should throw exception");
+		} catch (IllegalArgumentException e) {
+			
+		}
+		
+		Assert.assertEquals(r.columnAsString("movie", "name"), "Love You");
+		Assert.assertEquals(r.columnAsString("description"), "What is good");
+		Assert.assertEquals(r.columnAsString("celebrity", "name"), "Harsh");
 
 		System.out.println(DB.getMetadata("movie"));
 		Table.get("movie").columns(//
@@ -106,25 +113,32 @@ public class DBTest {
 	}
 
 	@Test
-	public void testMatchAgainst() throws SQLException{
+	public void testMatchAgainst() throws SQLException {
 		DB.loadMetadata("search");
-		
-		Table.get("search").columns(Column.bigInteger("entity_id"),
-                Column.text("entity_type", 50),
-                Column.text("title", 200),
-                Column.text("content",2048)).primary("entity_id", "entity_type")
-                .indexes(Index.create("FULLTEXT", IndexType.FULLTEXT, "title","content")).engine(EngineType.MY_ISAM)
-                .create();
-		
-		List<Row> rows  = Table.get("search").columns("entity_type", "title", "content").search(new String[]{"title", "content"}, "Tees Maar Khan", MatchMode.IN_NATURAL_LANGUAGE_MODE).rows();
+
+		Table.get("search")
+				.columns(Column.bigInteger("entity_id"),
+						Column.text("entity_type", 50),
+						Column.text("title", 200), Column.text("content", 2048))
+				.primary("entity_id", "entity_type")
+				.indexes(
+						Index.create("FULLTEXT", IndexType.FULLTEXT, "title",
+								"content")).engine(EngineType.MY_ISAM).create();
+
+		List<Row> rows = Table
+				.get("search")
+				.columns("entity_type", "title", "content")
+				.search(new String[] { "title", "content" }, "Tees Maar Khan",
+						MatchMode.IN_NATURAL_LANGUAGE_MODE).rows();
 		int count = 0;
 		for (Row r : rows) {
-			System.out.println(r.column("title")+"--------"+r.column("content"));
+			System.out.println(r.column("title") + "--------"
+					+ r.column("content"));
 			count++;
 		}
-		System.out.println("TOTAL--------"+count);
+		System.out.println("TOTAL--------" + count);
 	}
-	
+
 	@AfterClass
 	public static void tearDown() throws Exception {
 		DB.shutdown();
