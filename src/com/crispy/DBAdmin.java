@@ -259,7 +259,7 @@ public class DBAdmin extends HttpServlet {
 						rowJSON.put(toShow.display());
 					}
 				} else {
-					rowJSON.put(Utils.trim(r.columnAsString(column, ""), 30));
+					rowJSON.put(Utils.trim(r.columnAsString(column), 30));
 				}
 
 			}
