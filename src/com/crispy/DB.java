@@ -81,7 +81,8 @@ public class DB {
 			if (results.next()) {
 				tableExists = true;
 				if (!table.equals("_metadata")) {
-					Row commentRow = Table.get("_metadata").where("table", table).row();
+					Row commentRow = Table.get("_metadata")
+							.where("table", table).row();
 					String comment = null;
 					if (commentRow != null) {
 						comment = commentRow.columnAsString("metadata");
@@ -92,8 +93,7 @@ public class DB {
 						} catch (JSONException e) {
 							m.comment = new JSONObject();
 						}
-					}
-					else 
+					} else
 						m.comment = new JSONObject();
 				}
 
@@ -149,6 +149,8 @@ public class DB {
 	}
 
 	public static Metadata getMetadata(String table) {
+		if (!INSTANCE.tables.containsKey(table))
+			throw new IllegalArgumentException("No table found for " + table);
 		return INSTANCE.tables.get(table);
 	}
 

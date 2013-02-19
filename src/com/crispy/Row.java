@@ -22,7 +22,7 @@ public class Row implements IJSONConvertible {
 	private HashMap<String, Object> columns;
 	private HashMap<String, LinkedList<String>> columnToTableIndex;
 	private TreeSet<String> tables;
-			
+
 	protected Row(ResultSet results) throws SQLException {
 		columns = new HashMap<String, Object>();
 		columnToTableIndex = new HashMap<String, LinkedList<String>>();
@@ -31,9 +31,7 @@ public class Row implements IJSONConvertible {
 		for (int c = 0; c < meta.getColumnCount(); c++) {
 			String table = meta.getTableName(c + 1);
 			String column = meta.getColumnName(c + 1);
-			columns.put(
-					table + "." + column,
-					results.getObject(c + 1));
+			columns.put(table + "." + column, results.getObject(c + 1));
 			tables.add(table);
 			LinkedList<String> myTables = columnToTableIndex.get(column);
 			if (myTables == null) {
@@ -43,7 +41,7 @@ public class Row implements IJSONConvertible {
 			myTables.add(table);
 		}
 	}
-	
+
 	public String display() {
 		Metadata m = DB.getMetadata(tables.first());
 		if (m.getDisplay() == null)
@@ -54,25 +52,31 @@ public class Row implements IJSONConvertible {
 	private String getTable(String name) {
 		LinkedList<String> tables = columnToTableIndex.get(name);
 		if (tables == null)
-			throw new IllegalArgumentException("Column does not exist");
+			throw new IllegalArgumentException("Column does not exist " + name);
 		if (tables.size() > 1)
 			throw new IllegalArgumentException("Multiple tables exist");
 		return tables.getFirst();
 	}
-	
+
 	public Object column(String name) {
 		return column(getTable(name), name);
 	}
-	
+
 	public Object column(String table, String name) {
 		return columns.get(table + "." + name);
 	}
 
 	public String columnAsString(String name) {
+		if (name == null)
+			throw new IllegalArgumentException(
+					"Passed null argument to columnAsString argument=name");
 		return columnAsString(getTable(name), name);
 	}
-	
+
 	public String columnAsString(String table, String name) {
+		if (table == null)
+			throw new IllegalArgumentException(
+					"Passed null argument to columnAsString argument=table");
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object o = column(table, name);
 		if (o instanceof String)
@@ -83,7 +87,7 @@ public class Row implements IJSONConvertible {
 	public String columnAsUrl(String name) {
 		return columnAsUrl(getTable(name), name);
 	}
-	
+
 	public String columnAsUrl(String table, String name) {
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object value = column(name);
@@ -100,6 +104,10 @@ public class Row implements IJSONConvertible {
 
 	public JSONObject columnAsJSONObject(String name) throws JSONException {
 		return new JSONObject(columnAsString(name));
+	}
+
+	public String moneyAsString(String name, String currency) {
+		return moneyAsString(getTable(name), name, currency);
 	}
 
 	public String moneyAsString(String table, String name, String currency) {
@@ -147,11 +155,8 @@ public class Row implements IJSONConvertible {
 		return Long.parseLong(o.toString());
 	}
 
-	public int columnAsInt(String table, String name) {
-		Object o = column(table, name);
-		if (o instanceof Number)
-			return ((Number) o).intValue();
-		return Integer.parseInt(o.toString());
+	public int columnAsInt(String name, int def) {
+		return columnAsInt(getTable(name), name, def);
 	}
 
 	public boolean columnAsBool(String table, String name) {
@@ -162,6 +167,10 @@ public class Row implements IJSONConvertible {
 			return ((Integer) o) > 0;
 		}
 		return o != null;
+	}
+
+	public boolean columnAsBool(String name) {
+		return columnAsBool(getTable(name), name);
 	}
 
 	public int columnAsInt(String table, String name, int def) {
@@ -176,6 +185,10 @@ public class Row implements IJSONConvertible {
 	public Date columnAsDate(String table, String name) {
 		java.sql.Date sqlDate = (java.sql.Date) column(table, name);
 		return new Date(sqlDate.getTime());
+	}
+
+	public Date columnAsDate(String name) {
+		return columnAsDate(getTable(name), name);
 	}
 
 	@Override
@@ -202,7 +215,7 @@ public class Row implements IJSONConvertible {
 	}
 
 	public int columnAsInt(String name) {
-		return columnAsInt(getTable(name), name);
+		return columnAsInt(getTable(name), name, 0);
 	}
 
 	public long columnAsLong(String name) {
