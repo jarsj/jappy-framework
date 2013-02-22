@@ -39,7 +39,7 @@ public class DB {
 		INSTANCE.database = database;
 		BasicDataSource bds = new BasicDataSource();
 		bds.setDriverClassName("com.mysql.jdbc.Driver");
-		bds.setUrl("jdbc:mysql://localhost/" + database);
+		bds.setUrl("jdbc:mysql://localhost/" + database + "?zeroDateTimeBehavior=convertToNull");
 		bds.setUsername(user);
 		bds.setPassword(password);
 		bds.setTestOnBorrow(true);
@@ -149,8 +149,6 @@ public class DB {
 	}
 
 	public static Metadata getMetadata(String table) {
-		if (!INSTANCE.tables.containsKey(table))
-			throw new IllegalArgumentException("No table found for " + table);
 		return INSTANCE.tables.get(table);
 	}
 

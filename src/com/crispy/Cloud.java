@@ -55,7 +55,6 @@ public class Cloud {
 	private AccessControlList acl;
 
 	private Cloud() {
-
 	}
 
 	public static Cloud s3(String bucket) {
@@ -64,7 +63,7 @@ public class Cloud {
 		c.bucket = bucket;
 		return c;
 	}
-
+	
 	public Cloud create() {
 		if (!mBuckets.containsKey(bucket)) {
 			s3.createBucket(bucket);

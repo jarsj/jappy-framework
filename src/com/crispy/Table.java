@@ -34,6 +34,7 @@ public class Table {
 			return engineType;
 		}
 	}
+
 	public enum WhereOp {
 		EQUALS("="), NOT_EQUALS("!="), GREATER_THAN(">"), LESS_THAN("<"), LIKE(
 				" LIKE ");
@@ -65,35 +66,52 @@ public class Table {
 		}
 	}
 
+	static class UpdateExp {
+		String column;
+		int amount;
+	}
+
 	static class WhereExp {
 		String exp;
 		Object values[];
 
-		static WhereExp operator(String table, WhereOp op, String column, Object value) {
+		static WhereExp operator(String table, WhereOp op, String column,
+				Object value) {
 			WhereExp where = new WhereExp();
 			where.exp = table + ".`" + column + "`" + op.sqlOp() + "?";
 			where.values = new Object[1];
 			where.values[0] = value;
 			return where;
 		}
-		
+
 		static WhereExp in(String table, String column, Object value[]) {
 			WhereExp where = new WhereExp();
-			where.exp = table + ".`" + column + "` IN (" + StringUtils.join(Collections.nCopies(value.length, "?"), ",") + ")";
+			where.exp = table
+					+ ".`"
+					+ column
+					+ "` IN ("
+					+ StringUtils.join(Collections.nCopies(value.length, "?"),
+							",") + ")";
 			where.values = new Object[value.length];
 			for (int i = 0; i < value.length; i++) {
 				where.values[i] = value[i];
 			}
 			return where;
 		}
-		
-		static WhereExp matchAgainst(String table, String[] columns, String[] value, MatchMode mode) {
+
+		static WhereExp matchAgainst(String table, String[] columns,
+				String[] value, MatchMode mode) {
 			WhereExp where = new WhereExp();
-			StringBuilder match = new StringBuilder(table + ".`" + columns[0] + "`");
+			StringBuilder match = new StringBuilder(table + ".`" + columns[0]
+					+ "`");
 			for (int i = 1; i < columns.length; i++) {
 				match.append("," + table + ".`" + columns[i] + "`");
 			}
-			where.exp = "MATCH ("+match.toString()+") AGAINST (" + StringUtils.join(Collections.nCopies(value.length, "?"), " ") + " "+mode.sqlMatchMode()+")";
+			where.exp = "MATCH ("
+					+ match.toString()
+					+ ") AGAINST ("
+					+ StringUtils.join(Collections.nCopies(value.length, "?"),
+							" ") + " " + mode.sqlMatchMode() + ")";
 			where.values = new Object[value.length];
 			for (int i = 0; i < value.length; i++) {
 				where.values[i] = value[i];
@@ -116,6 +134,7 @@ public class Table {
 	private ArrayList<Column> newColumns;
 	private ArrayList<Index> newIndexes;
 	private ArrayList<Constraint> newConstraints;
+	private ArrayList<UpdateExp> increments;
 
 	private Index newPrimaryKey;
 
@@ -129,7 +148,7 @@ public class Table {
 	private JSONObject comment;
 
 	private String average;
-	
+
 	private boolean ignore;
 
 	private int start;
@@ -139,7 +158,6 @@ public class Table {
 	private String groupBy;
 
 	private EngineType engineType;
-	
 
 	public static Table get(String name) {
 		Table t = new Table(name);
@@ -150,7 +168,7 @@ public class Table {
 		this.engineType = type;
 		return this;
 	}
-	
+
 	public Table overwrite(String... column) {
 		this.overwriteColumns = new ArrayList<String>();
 		this.overwriteColumns.addAll(Arrays.asList(column));
@@ -161,7 +179,7 @@ public class Table {
 		deleteOldColumns = false;
 
 		random = false;
-		unique = false;		
+		unique = false;
 		ignore = false;
 		limit = -1;
 		start = -1;
@@ -275,8 +293,9 @@ public class Table {
 				}
 			}
 
-			if(engineType != null){
-				DB.updateQuery("ALTER TABLE `" + name + "` ENGINE = " + engineType.getType());
+			if (engineType != null) {
+				DB.updateQuery("ALTER TABLE `" + name + "` ENGINE = "
+						+ engineType.getType());
 			}
 			if (newIndexes == null)
 				newIndexes = new ArrayList<Index>();
@@ -366,6 +385,32 @@ public class Table {
 
 	}
 
+	public Table increment(String... columns) {
+		if (this.increments == null) {
+			this.increments = new ArrayList<Table.UpdateExp>();
+		}
+		for (String col : columns) {
+			UpdateExp ue = new UpdateExp();
+			ue.column = col;
+			ue.amount = 1;
+			this.increments.add(ue);
+		}
+		return this;
+	}
+
+	public Table decrement(String... columns) {
+		if (this.increments == null) {
+			this.increments = new ArrayList<Table.UpdateExp>();
+		}
+		for (String col : columns) {
+			UpdateExp ue = new UpdateExp();
+			ue.column = col;
+			ue.amount = -1;
+			this.increments.add(ue);
+		}
+		return this;
+	}
+
 	public Table values(Object... values) {
 		if (this.values == null) {
 			this.values = new ArrayList<Object>();
@@ -377,7 +422,8 @@ public class Table {
 			String columnName = columnNames.get(i);
 			Column c = Column.findByName(m.columns, columnName);
 			if (c == null) {
-				throw new IllegalStateException("Missing column " + columnName + " in table " + name);
+				throw new IllegalStateException("Missing column " + columnName
+						+ " in table " + name);
 			}
 			this.values.add(c.parseObject(values[i]));
 		}
@@ -401,13 +447,13 @@ public class Table {
 		ignoreNull = true;
 		return this;
 	}
-	
+
 	public Table random() {
 		this.random = true;
 		return this;
 	}
 
-	public void update() throws SQLException {
+	public void update() {
 		Connection con = DB.getConnection();
 		try {
 			StringBuilder sb = new StringBuilder();
@@ -417,9 +463,17 @@ public class Table {
 			}
 			sb.append(" `" + name + "` SET ");
 			ArrayList<String> updates = new ArrayList<String>();
-			for (int c = 0; c < columnNames.size(); c++) {
-				if (!ignoreNull || values.get(c) != null)
-					updates.add("`" + columnNames.get(c) + "`=?");
+			if (columnNames != null) {
+				for (int c = 0; c < columnNames.size(); c++) {
+					if (!ignoreNull || values.get(c) != null)
+						updates.add("`" + columnNames.get(c) + "`=?");
+				}
+			}
+			if (increments != null) {
+				for (UpdateExp ue : increments) {
+					updates.add(String.format("`%s`=`%s`+?", ue.column,
+							ue.column));
+				}
 			}
 			sb.append(StringUtils.join(updates, ','));
 
@@ -428,17 +482,31 @@ public class Table {
 			PreparedStatement pstmt = con.prepareStatement(sb.toString());
 			int c = 1;
 
-			for (int v = 0; v < values.size(); v++) {
-				if (!ignoreNull || values.get(v) != null)
-					pstmt.setObject(c++, values.get(v));
+			if (columnNames != null) {
+				for (int v = 0; v < values.size(); v++) {
+					if (!ignoreNull || values.get(v) != null)
+						pstmt.setObject(c++, values.get(v));
+				}
+			}
+			if (increments != null) {
+				for (UpdateExp ue : increments) {
+					pstmt.setInt(c++, ue.amount);
+				}
 			}
 
 			whereValues(pstmt, c);
 
 			pstmt.executeUpdate();
 			pstmt.close();
-		} finally {
-			con.close();
+		} catch (SQLException e) {
+			throw new IllegalStateException(e);
+		}
+
+		finally {
+			try {
+				con.close();
+			} catch (Exception e) {
+			}
 		}
 	}
 
@@ -451,7 +519,7 @@ public class Table {
 		Connection con = DB.getConnection();
 		try {
 			long genId = -1;
-			
+
 			StringBuilder sb = new StringBuilder();
 			sb.append("INSERT "
 					+ (((overwriteColumns != null) || ignore) ? "IGNORE " : "")
@@ -473,7 +541,7 @@ public class Table {
 			}
 
 			PreparedStatement pstmt = con.prepareStatement(sb.toString());
-			
+
 			int c = 1;
 			for (Object value : values) {
 				pstmt.setObject(c++, value);
@@ -487,12 +555,12 @@ public class Table {
 			}
 
 			pstmt.executeUpdate();
-			
+
 			ResultSet generated = pstmt.getGeneratedKeys();
 			if (generated.next()) {
 				genId = generated.getLong(1);
 			}
-			
+
 			pstmt.close();
 			return genId;
 		} finally {
@@ -569,7 +637,7 @@ public class Table {
 				break;
 			}
 		}
-		
+
 		for (Table t : joins) {
 			if (t.orderBy != null) {
 				sb.append(" ORDER BY `" + t.name + "`." + t.orderBy);
@@ -594,7 +662,7 @@ public class Table {
 		}
 		return pstmt;
 	}
-	
+
 	@Override
 	public String toString() {
 		return name;
@@ -609,7 +677,7 @@ public class Table {
 
 		if (unique)
 			sb.append("DISTINCT ");
-		
+
 		if (columnNames != null) {
 			ArrayList<String> names = new ArrayList<String>();
 			for (String columnName : columnNames) {
@@ -630,7 +698,7 @@ public class Table {
 		if (groupBy != null) {
 			sb.append(" GROUP BY `" + groupBy + "`");
 		}
-		
+
 		if (orderBy != null) {
 			sb.append(" ORDER BY " + orderBy);
 		}
@@ -698,7 +766,7 @@ public class Table {
 			}
 		}
 	}
-	
+
 	public <T> List<T> customRows(Class<T> c) {
 		Connection con = DB.getConnection();
 		try {
@@ -722,7 +790,7 @@ public class Table {
 			}
 		}
 	}
-	
+
 	public Table where(String column, Object value) {
 		return where(column, value, WhereOp.EQUALS);
 	}
@@ -731,7 +799,8 @@ public class Table {
 		Metadata m = DB.getMetadata(name);
 		Column c = Column.findByName(m.columns, column);
 		if (c == null) {
-			throw new IllegalStateException("No column exists for " + column + " in table " + name);
+			throw new IllegalStateException("No column exists for " + column
+					+ " in table " + name);
 		}
 		Object[] parsed = new Object[value.length];
 		for (int i = 0; i < value.length; i++) {
@@ -743,22 +812,26 @@ public class Table {
 
 	public Table search(String[] columns, String query, MatchMode mode) {
 		Metadata m = DB.getMetadata(name);
-		if(columns.length == 0){
-			throw new IllegalStateException("Not a single column available to match");
+		if (columns.length == 0) {
+			throw new IllegalStateException(
+					"Not a single column available to match");
 		}
 		for (int i = 0; i < columns.length; i++) {
 			Column c = Column.findByName(m.columns, columns[i]);
 			if (c == null) {
-				throw new IllegalStateException("No column exists for " + c + " in table " + name);
+				throw new IllegalStateException("No column exists for " + c
+						+ " in table " + name);
 			}
 		}
-		if(query == null || query.equals("")){
-			throw new IllegalStateException("No keyword available to match against");
+		if (query == null || query.equals("")) {
+			throw new IllegalStateException(
+					"No keyword available to match against");
 		}
-		if(mode == null){
+		if (mode == null) {
 			mode = MatchMode.IN_NATURAL_LANGUAGE_MODE;
 		}
-		where.add(WhereExp.matchAgainst(name, columns, new String[]{query}, mode));
+		where.add(WhereExp.matchAgainst(name, columns, new String[] { query },
+				mode));
 		return this;
 	}
 
@@ -768,7 +841,8 @@ public class Table {
 			throw new IllegalStateException("No table exists for " + name);
 		Column c = Column.findByName(m.columns, column);
 		if (c == null) {
-			throw new IllegalStateException("No column exists for " + column + " in table " + name);
+			throw new IllegalStateException("No column exists for " + column
+					+ " in table " + name);
 		}
 		where.add(WhereExp.operator(name, op, column, c.parseObject(value)));
 		return this;
@@ -789,9 +863,9 @@ public class Table {
 		} finally {
 			con.close();
 		}
-		
+
 	}
-	
+
 	public long count() throws SQLException {
 		Connection con = DB.getConnection();
 		try {
@@ -902,7 +976,7 @@ public class Table {
 		joins.add(t);
 		return this;
 	}
-	
+
 	public Table groupBy(String column) {
 		this.groupBy = column;
 		return this;
@@ -915,7 +989,7 @@ public class Table {
 		where.add(exp);
 		return this;
 	}
-	
+
 	public Table unique() {
 		this.unique = true;
 		return this;
