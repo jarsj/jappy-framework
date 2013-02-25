@@ -93,6 +93,8 @@ public class Utils {
 	}
 
 	public static String trim(String s, int length) {
+		if (s == null)
+			return null;
 		if (s.length() > length)
 			return s.substring(0, length) + "...";
 		return s;
