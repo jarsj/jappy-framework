@@ -203,7 +203,7 @@ public class DB {
 
 	public static void updateQuery(Connection con, String sql, Object... args)
 			throws SQLException {
-		LOG.info(sql);
+		LOG.trace(sql);
 		PreparedStatement pstmt = con.prepareStatement(sql);
 		for (int i = 0; i < args.length; i++) {
 			pstmt.setObject(i + 1, args[i]);

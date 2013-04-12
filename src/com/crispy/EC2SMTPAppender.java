@@ -29,9 +29,7 @@ package com.crispy;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.URISyntaxException;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.net.SMTPAppender;
@@ -50,16 +48,18 @@ import org.json.JSONObject;
 public class EC2SMTPAppender extends ConsoleAppender {
 
 	String to;
+	Level l;
 
-	public EC2SMTPAppender(String to) {
+	public EC2SMTPAppender(String to, Level l) {
 		super();
 		this.to = to;
+		this.l = l;
 	}
 
 	@Override
 	public void append(LoggingEvent event) {
-		if (event.getLevel().equals(Level.ERROR)) {
-			try {
+		try {
+			if (event.getLevel().isGreaterOrEqual(l)) {
 				JSONObject mail = new JSONObject();
 				mail.put("to", to);
 				mail.put("subject", "Error: " + event.getLogger().getName()
@@ -67,7 +67,10 @@ public class EC2SMTPAppender extends ConsoleAppender {
 				String body = event.getMessage() + "\n" + "Thread Name : "
 						+ event.getThreadName() + "\n\n";
 				try {
-					body = body + EC2SMTPAppender.class.getProtectionDomain().getCodeSource().getLocation().toURI().toASCIIString();
+					body = body
+							+ EC2SMTPAppender.class.getProtectionDomain()
+									.getCodeSource().getLocation().toURI()
+									.toASCIIString();
 				} catch (Throwable t) {
 				}
 
@@ -84,15 +87,12 @@ public class EC2SMTPAppender extends ConsoleAppender {
 				}
 
 				Mail.getInstance().sendMail(
-						new JSONObject()
-								.put("to", to)
-								.put("subject",
-										"Error: " + event.getLogger().getName()
-												+ ":" + event.getMessage())
-								.put("body", body));
-			} catch (JSONException e) {
-				e.printStackTrace();
+						to,
+						"Error: " + event.getLogger().getName() + ":"
+								+ event.getMessage(), body);
 			}
+		} catch (Throwable t) {
+			t.printStackTrace();
 		}
 	}
 

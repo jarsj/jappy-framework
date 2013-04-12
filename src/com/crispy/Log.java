@@ -1,14 +1,14 @@
 package com.crispy;
 
 import java.io.File;
-import java.util.Enumeration;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
-import org.apache.log4j.Priority;
+import org.apache.log4j.RollingFileAppender;
 
 /**
  * Logging Library. Captures the most common usecases of logging.
@@ -17,10 +17,14 @@ import org.apache.log4j.Priority;
  * 
  */
 public class Log {
-
-	private static String DEFAULT_FOLDER = "/mnt/logs";
+	private static String DEFAULT_DAILY_FOLDER;
 	private static boolean DEFAULT_CONSOLE;
 	private static Level DEFAULT_LEVEL;
+	private static String DEFAULT_EMAIL_TO;
+	private static Level DEFAULT_EMAIL_LEVEL;
+	private static Level DEFAULT_DAILY_LEVEL;
+	private static String DEFAULT_SIZE_FOLDER;
+	private static Level DEFAULT_SIZE_LEVEL;
 
 	private String name;
 	private Logger logger;
@@ -33,11 +37,17 @@ public class Log {
 		if (DEFAULT_CONSOLE) {
 			console();
 		}
-		if (DEFAULT_FOLDER != null) {
-			file(DEFAULT_FOLDER);
+		if (DEFAULT_DAILY_FOLDER != null) {
+			daily(DEFAULT_DAILY_FOLDER, DEFAULT_DAILY_LEVEL);
+		}
+		if (DEFAULT_SIZE_FOLDER != null) {
+			size(DEFAULT_SIZE_FOLDER, 64, DEFAULT_SIZE_LEVEL);
 		}
 		if (DEFAULT_LEVEL != null) {
 			level(DEFAULT_LEVEL);
+		}
+		if (DEFAULT_EMAIL_TO != null) {
+			email(DEFAULT_EMAIL_TO, DEFAULT_EMAIL_LEVEL);
 		}
 	}
 
@@ -45,12 +55,23 @@ public class Log {
 		return new Log(name);
 	}
 
-	public static void globalFile(String folder) {
+	public static void globalDaily(String folder, Level l) {
 		try {
-			if (new File(folder).mkdirs()) {
-				DEFAULT_FOLDER = folder;
-			}
+			FileUtils.forceMkdir(new File(folder));
+			DEFAULT_DAILY_FOLDER = folder;
+			DEFAULT_DAILY_LEVEL = l;
 		} catch (Throwable t) {
+			t.printStackTrace();
+		}
+	}
+
+	public static void globalSize(String folder, Level l) {
+		try {
+			FileUtils.forceMkdir(new File(folder));
+			DEFAULT_SIZE_FOLDER = folder;
+			DEFAULT_SIZE_LEVEL = l;
+		} catch (Throwable t) {
+			t.printStackTrace();
 		}
 	}
 
@@ -58,26 +79,41 @@ public class Log {
 		DEFAULT_CONSOLE = true;
 	}
 
-	public Log file(String folder) {
-		return file(folder, Priority.DEBUG);
+	public static void globalEmail(String to, Level l) {
+		DEFAULT_EMAIL_TO = to;
+		DEFAULT_EMAIL_LEVEL = l;
 	}
 
-	public Log file(String folder, Priority p) {
-		logger.removeAppender("jappy-file");
-		File ff = new File(folder);
-		if (!ff.exists()) {
-			ff.mkdirs();
-		}
+	public Log daily(String folder, Level l) {
 		try {
-			if (ff.exists() && ff.isDirectory()) {
-				DailyRollingFileAppender appender = new DailyRollingFileAppender(
-						new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"),
-						new File(folder + "/" + name).getAbsolutePath(),
-						"dd-MM-yyyy");
-				appender.setName("jappy-file");
-				appender.setThreshold(p);
-				logger.addAppender(appender);
-			}
+			FileUtils.forceMkdir(new File(folder));
+			DailyRollingFileAppender appender = new DailyRollingFileAppender(
+					new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"), new File(
+							folder + "/" + name).getAbsolutePath(),
+					"dd-MM-yyyy");
+			appender.setName("jappy-daily");
+			appender.setThreshold(l);
+
+			logger.removeAppender("jappy-daily");
+			logger.addAppender(appender);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return this;
+	}
+
+	public Log size(String folder, int maxSizeInMB, Level l) {
+		try {
+			FileUtils.forceMkdir(new File(folder));
+			RollingFileAppender appender = new RollingFileAppender(
+					new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"), new File(
+							folder + "/" + name).getAbsolutePath());
+			appender.setName("jappy-size");
+			appender.setMaxFileSize(maxSizeInMB + "MB");
+			appender.setThreshold(l);
+			appender.setMaxBackupIndex(100);
+			logger.removeAppender("jappy-size");
+			logger.addAppender(appender);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -100,12 +136,12 @@ public class Log {
 		return this;
 	}
 
-	public Log email(String to, Priority p) {
-
-		EC2SMTPAppender email = new EC2SMTPAppender(to);
+	public Log email(String to, Level l) {
+		logger.removeAppender("jappy-email");
+		EC2SMTPAppender email = new EC2SMTPAppender(to, l);
 		email.setName("jappy-email");
 		email.activateOptions();
-		email.setThreshold(p);
+		email.setThreshold(l);
 		logger.addAppender(email);
 		return this;
 	}

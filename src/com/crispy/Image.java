@@ -141,6 +141,11 @@ public class Image extends HttpServlet {
 				source.getName().lastIndexOf(".") + 1);
 		return internalScale(image, extension, width, height);
 	}
+	
+	public static int[] dimensions(URL source) throws IOException {
+		BufferedImage image = ImageIO.read(source);
+		return new int[]{image.getWidth(), image.getHeight()};
+	}
 
 	public static File scale(File source, int size) throws IOException {
 		BufferedImage image = JAI.create("fileload", source.getAbsolutePath())
@@ -178,5 +183,7 @@ public class Image extends HttpServlet {
 		ImageIO.write(scaled, extension, tempFile);
 		return tempFile;
 	}
+	
+	
 
 }

@@ -54,7 +54,7 @@ public class Row implements IJSONConvertible {
 		if (tables == null)
 			throw new IllegalArgumentException("Column does not exist " + name);
 		if (tables.size() > 1)
-			throw new IllegalArgumentException("Multiple tables exist");
+			throw new IllegalArgumentException("Multiple tables exist for column " + name);
 		return tables.getFirst();
 	}
 

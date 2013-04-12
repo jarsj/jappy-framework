@@ -5,6 +5,8 @@ import java.util.HashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.crispy.Cache.Expire;
+
 public class Job {
 	private String url;
 	private HashMap<String, String> headers;
@@ -34,6 +36,11 @@ public class Job {
 		this.tag = tag;
 		this.extra = new JSONObject();
 	}
+	
+	public Job(String url, int p, Expire expiry, String tag) {
+		this(url, p, expiry.expires(), tag);
+	}
+
 
 	public void setMetadata(JSONObject o) throws JSONException {
 		this.cacheKey = o.optString("cache-key", null);

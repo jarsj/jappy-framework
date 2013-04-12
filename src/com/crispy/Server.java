@@ -10,8 +10,6 @@ import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
 import javax.servlet.annotation.WebServlet;
 
-import org.eclipse.jetty.servlets.MultiPartFilter;
-import org.eclipse.jetty.util.MultiPartInputStream.MultiPart;
 import org.eclipse.jetty.webapp.WebAppContext;
 
 @WebListener
@@ -56,7 +54,9 @@ public class Server implements ServletContextListener {
 	
 	public static void startJetty(int port, Class ... servlets) throws Exception {
 		jettyServer = new org.eclipse.jetty.server.Server(port);
+		
 		WebAppContext context = new WebAppContext();
+		
 		context.setResourceBase("web/");
 		context.setContextPath("/");
 		context.addServlet(DBAdmin.class, "/dbadmin/*");
@@ -73,6 +73,8 @@ public class Server implements ServletContextListener {
 		context.addFilter(Url.class, "/*", EnumSet.of(DispatcherType.REQUEST));
 		jettyServer.setHandler(context);
 		jettyServer.start();
+		
+		
 		
 		Server.jetty_context = context;
 	}

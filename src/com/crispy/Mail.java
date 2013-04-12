@@ -1,6 +1,9 @@
 package com.crispy;
 
+import java.util.Map;
 import java.util.Properties;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -14,15 +17,20 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
+/**
+ * Mail component.
+ * 
+ * @author harsh
+ */
 public class Mail implements Runnable {
 	private static Mail INSTANCE = new Mail();
 	private Properties props;
 	private String username;
 	private String password;
 	private ScheduledExecutorService background;
+	private ConcurrentHashMap<String, LinkedBlockingQueue<String>> queue;
 
 	public Mail() {
 
@@ -38,8 +46,8 @@ public class Mail implements Runnable {
 		this.password = password;
 
 		background = Executors.newSingleThreadScheduledExecutor();
-		queue = new LinkedBlockingQueue<JSONObject>();
-		background.scheduleAtFixedRate(this, 1, 1, TimeUnit.MINUTES);
+		queue = new ConcurrentHashMap<String, LinkedBlockingQueue<String>>();
+		background.scheduleAtFixedRate(this, 5, 5, TimeUnit.MINUTES);
 	}
 
 	public static Mail getInstance() {
@@ -47,40 +55,57 @@ public class Mail implements Runnable {
 	}
 
 	public void sendMail(String to, String subject, String body) {
+		LinkedBlockingQueue<String> q = queue.get(to);
+		if (q == null) {
+			q = new LinkedBlockingQueue<String>();
+			queue.put(to, q);
+		}
 		try {
-			sendMail(new JSONObject().put("to", to).put("subject", subject).put("body", body));
-		} catch (JSONException e) {
+			q.add(new JSONObject().put("to", to).put("subject", subject)
+					.put("body", body).toString());
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-	}
-	
-	public void sendMail(JSONObject mail) {
-		if (queue.size() > 100)
-			return;
-		if (!(mail.has("to") && mail.has("subject") && mail.has("body"))) {
-			throw new IllegalArgumentException(
-					"Mail JSON misses to, subject or body");
-		}
-		queue.add(mail);
 	}
 
 	@Override
 	public void run() {
 		try {
-			JSONObject mail = queue.poll();
-			if (mail != null) {
-				Authenticator auth = new Authenticator() {
-					protected PasswordAuthentication getPasswordAuthentication() {
-						return new PasswordAuthentication(username, password);
-					}
-				};
-				Session session = Session.getDefaultInstance(props, auth);
-				MimeMessage message = new MimeMessage(session);
-				message.setFrom(new InternetAddress("harsh@zopte.com"));
-				message.addRecipient(Message.RecipientType.TO,
-						new InternetAddress(mail.getString("to")));
-				message.setSubject(Utils.trim(mail.getString("subject"), 50));
-				message.setText(mail.getString("body"));
-				Transport.send(message);
+			for (Map.Entry<String, LinkedBlockingQueue<String>> entry : queue
+					.entrySet()) {
+				String to = entry.getKey();
+				LinkedBlockingQueue<String> q = entry.getValue();
+
+				TreeSet<String> t = new TreeSet<String>();
+				q.drainTo(t);
+
+				int numEmails = 0;
+				StringBuilder body = new StringBuilder();
+				for (String mail : t) {
+					JSONObject o = new JSONObject(mail);
+					body.append("Subject : " + o.getString("subject") + "\n");
+					body.append(o.getString("body"));
+					body.append("\n\n");
+					numEmails++;
+				}
+
+				if (numEmails > 0) {
+
+					Authenticator auth = new Authenticator() {
+						protected PasswordAuthentication getPasswordAuthentication() {
+							return new PasswordAuthentication(username,
+									password);
+						}
+					};
+					Session session = Session.getDefaultInstance(props, auth);
+					MimeMessage message = new MimeMessage(session);
+					message.setFrom(new InternetAddress("harsh@zopte.com"));
+					message.addRecipient(Message.RecipientType.TO,
+							new InternetAddress(to));
+					message.setSubject("Emails from Server = " + numEmails);
+					message.setText(body.toString());
+					Transport.send(message);
+				}
 			}
 		} catch (Throwable t) {
 			t.printStackTrace();
@@ -93,5 +118,4 @@ public class Mail implements Runnable {
 		}
 	}
 
-	private LinkedBlockingQueue<JSONObject> queue;
 }

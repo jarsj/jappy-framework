@@ -713,7 +713,7 @@ public class Table {
 			}
 		}
 
-		LOG.info(sb.toString());
+		LOG.trace(sb.toString());
 		PreparedStatement pstmt = con.prepareStatement(sb.toString());
 		int c = 1;
 		whereValues(pstmt, c);
