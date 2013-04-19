@@ -1,6 +1,7 @@
 package com.crispy.tools;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,6 +10,7 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.SimpleDateFormat;
@@ -47,9 +49,13 @@ public class S3Sync {
 	private static int fileSize;
 	private static boolean current;
 	private static AmazonS3Client s3;
-	private static ByteBuffer buffer;
+	private static File bufferFile;
+	private static FileOutputStream bufferStream;
+	private static byte[] NEW_LINE = "\n".getBytes();
+	
 	private static long run;
-
+	private static int bytesWritten;
+	
 	public static void main(String[] args) throws ParseException, IOException {
 		Options options = new Options();
 		options.addOption("accessKey", true, "Your AWS AccessKey");
@@ -85,8 +91,9 @@ public class S3Sync {
 		current = cmd.hasOption("current");
 		s3 = new AmazonS3Client(credentials);
 
-		buffer = ByteBuffer.allocate(fileSize);
-
+		bufferFile = null;
+		bufferStream = null;
+		
 		for (String prefix : cmd.getArgs()) {
 			doPrefix(prefix);
 		}
@@ -94,7 +101,9 @@ public class S3Sync {
 
 	private static void doPrefix(final String prefix) throws IOException {
 		System.out.println("Doing prefix = " + prefix);
-		buffer.clear();
+		bufferFile = File.createTempFile(prefix, "buffer");
+		bufferStream = new FileOutputStream(bufferFile);
+		bytesWritten = 0;
 		File fs[] = logFolder.listFiles(new FilenameFilter() {
 			@Override
 			public boolean accept(File dir, String name) {
@@ -139,11 +148,13 @@ public class S3Sync {
 			String s = null;
 			while ((s = br.readLine()) != null) {
 				byte[] b = s.getBytes();
-				if ((b.length + 2) > buffer.remaining()) {
+				
+				if ((bytesWritten + b.length + 2) > fileSize) {
 					uploadBuffer(prefix, yearMonthPrefix);
 				}
-				buffer.put(b);
-				buffer.putChar('\n');
+				
+				bufferStream.write(b);
+				bufferStream.write(NEW_LINE);
 			}
 			br.close();
 		}
@@ -152,21 +163,18 @@ public class S3Sync {
 
 	private static void uploadBuffer(String prefix, String ym)
 			throws IOException {
-		buffer.flip();
-		File tmpFile = File.createTempFile(prefix, "tmp");
-		System.out.println(tmpFile.getAbsolutePath());
-		FileChannel out = new FileOutputStream(tmpFile).getChannel();
-		out.write(buffer);
-		out.close();
+		bufferStream.close();
 
 		ObjectMetadata meta = new ObjectMetadata();
 		meta.setContentType("text/plain");
 		PutObjectRequest put = new PutObjectRequest(bucketName, bucketPath
 				+ prefix + "/" + prefix + "-" + ym + "-" + (++run), new FileInputStream(
-				tmpFile), meta);
+				bufferFile), meta);
 		PutObjectResult result = s3.putObject(put);
 		System.out.println("Uploaded to S3 " + result.getVersionId());
-		buffer.clear();
+		
+		bufferFile = File.createTempFile(prefix, "buffer");
+		bufferStream = new FileOutputStream(bufferFile);
 	}
 
 	private static String yearMonth(long ts) {
