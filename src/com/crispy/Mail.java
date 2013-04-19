@@ -1,8 +1,9 @@
 package com.crispy;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -33,7 +34,6 @@ public class Mail implements Runnable {
 	private ConcurrentHashMap<String, LinkedBlockingQueue<String>> queue;
 
 	public Mail() {
-
 	}
 
 	public void start(String host, String username, String password) {
@@ -71,39 +71,44 @@ public class Mail implements Runnable {
 	@Override
 	public void run() {
 		try {
+			
+			Authenticator auth = new Authenticator() {
+				protected PasswordAuthentication getPasswordAuthentication() {
+					return new PasswordAuthentication(username,
+							password);
+				}
+			};
+			
+			Session session = Session.getDefaultInstance(props, auth);
+			
 			for (Map.Entry<String, LinkedBlockingQueue<String>> entry : queue
 					.entrySet()) {
 				String to = entry.getKey();
 				LinkedBlockingQueue<String> q = entry.getValue();
-
-				TreeSet<String> t = new TreeSet<String>();
+				
+				ArrayList<String> t = new ArrayList<String>();
 				q.drainTo(t);
 
-				int numEmails = 0;
-				StringBuilder body = new StringBuilder();
+				HashMap<String, StringBuilder> bySubjects = new HashMap<String, StringBuilder>();
+				
 				for (String mail : t) {
 					JSONObject o = new JSONObject(mail);
-					body.append("Subject : " + o.getString("subject") + "\n");
-					body.append(o.getString("body"));
+					StringBuilder body = bySubjects.get(o.getString("subject"));
+					if (body == null) {
+						body = new StringBuilder();
+						bySubjects.put(o.getString("subject"), body);
+					}
 					body.append("\n\n");
-					numEmails++;
+					body.append(o.getString("body"));
 				}
-
-				if (numEmails > 0) {
-
-					Authenticator auth = new Authenticator() {
-						protected PasswordAuthentication getPasswordAuthentication() {
-							return new PasswordAuthentication(username,
-									password);
-						}
-					};
-					Session session = Session.getDefaultInstance(props, auth);
+					
+				for (Map.Entry<String, StringBuilder> entry2 : bySubjects.entrySet()) {
 					MimeMessage message = new MimeMessage(session);
 					message.setFrom(new InternetAddress("harsh@zopte.com"));
 					message.addRecipient(Message.RecipientType.TO,
 							new InternetAddress(to));
-					message.setSubject("Emails from Server = " + numEmails);
-					message.setText(body.toString());
+					message.setSubject(entry2.getKey());
+					message.setText(entry2.getValue().toString());
 					Transport.send(message);
 				}
 			}
