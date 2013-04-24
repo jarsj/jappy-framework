@@ -144,6 +144,9 @@ public class Image extends HttpServlet {
 	
 	public static int[] dimensions(URL source) throws IOException {
 		BufferedImage image = ImageIO.read(source);
+		if (image == null) {
+			return new int[]{-1,-1};
+		}
 		return new int[]{image.getWidth(), image.getHeight()};
 	}
 

@@ -1,7 +1,9 @@
 package com.crispy;
 
 import java.io.File;
+import java.net.URLEncoder;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.DailyRollingFileAppender;
@@ -88,7 +90,7 @@ public class Log {
 		try {
 			FileUtils.forceMkdir(new File(folder));
 			DailyRollingFileAppender appender = new DailyRollingFileAppender(
-					new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"), new File(
+					new PatternLayout("%p %d{yyyy-MM-dd HH:mm:ss}: %m%n"), new File(
 							folder + "/" + name).getAbsolutePath(),
 					"dd-MM-yyyy");
 			appender.setName("jappy-daily");
@@ -106,7 +108,7 @@ public class Log {
 		try {
 			FileUtils.forceMkdir(new File(folder));
 			RollingFileAppender appender = new RollingFileAppender(
-					new PatternLayout("%p %d{HH:mm:ss} %c{2}: %m%n"), new File(
+					new PatternLayout("%p %d{yyyy-MM-dd HH:mm:ss}: %m%n"), new File(
 							folder + "/" + name).getAbsolutePath());
 			appender.setName("jappy-size");
 			appender.setMaxFileSize(maxSizeInMB + "MB");
@@ -130,7 +132,7 @@ public class Log {
 		ConsoleAppender console = new ConsoleAppender();
 		console.setName("jappy-console");
 		console.setLayout(new PatternLayout(
-				"%d{ISO8601} [%t] %-5p %c %x - %m%n"));
+				"%d{yyyy-MM-dd HH:mm:ss} %m%n"));
 		console.activateOptions();
 		logger.addAppender(console);
 		return this;
@@ -174,5 +176,9 @@ public class Log {
 
 	public void debug(String message) {
 		logger.debug(message);
+	}
+	
+	public static String safe(String m) {
+		return URLEncoder.encode(m);
 	}
 }

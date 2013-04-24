@@ -398,6 +398,16 @@ public class Table {
 		return this;
 	}
 
+	public Table add(String column, int value) {
+		if (this.increments == null)
+			this.increments = new ArrayList<Table.UpdateExp>();
+		UpdateExp ue = new UpdateExp();
+		ue.column = column;
+		ue.amount = value;
+		this.increments.add(ue);
+		return this;
+	}
+
 	public Table decrement(String... columns) {
 		if (this.increments == null) {
 			this.increments = new ArrayList<Table.UpdateExp>();
@@ -743,6 +753,59 @@ public class Table {
 		}
 	}
 
+	public void rows(RowCallback callback) {
+		Connection con = DB.getConnection();
+		try {
+			PreparedStatement pstmt = createSelectStatement(con, false);
+			pstmt.setFetchSize(Integer.MIN_VALUE);
+			ResultSet results = pstmt.executeQuery();
+			while (results.next()) {
+				callback.row(new Row(results));
+			}
+			pstmt.close();
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+			throw new IllegalStateException(t);
+		} finally {
+			try {
+				con.close();
+			} catch (Throwable t) {
+			}
+		}
+	}
+
+	public void lock() {
+		Connection con = DB.getConnection();
+		try {
+			PreparedStatement pstmt = con.prepareStatement("LOCK TABLE ?");
+			pstmt.setString(1, name);
+			pstmt.executeQuery();
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+		} finally {
+			try {
+				con.close();
+			} catch (Throwable t) {
+			}
+		}
+	}
+	
+	public void unlock() {
+		Connection con = DB.getConnection();
+		try {
+			PreparedStatement pstmt = con.prepareStatement("UNLOCK TABLE ?");
+			pstmt.setString(1, name);
+			pstmt.executeQuery();
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+		} finally {
+			try {
+				con.close();
+			} catch (Throwable t) {
+			}
+		}
+	}
+
 	public List<Row> rows() {
 		Connection con = DB.getConnection();
 		try {
@@ -980,6 +1043,10 @@ public class Table {
 	public Table groupBy(String column) {
 		this.groupBy = column;
 		return this;
+	}
+
+	public Table greater(String column, Object value) {
+		return where(column, value, WhereOp.GREATER_THAN);
 	}
 
 	public Table isNull(String column) {

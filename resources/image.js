@@ -1,13 +1,11 @@
 function JappyConvertFileInput(input) {
 	if (input.attr("data-folder") || input.attr("data-bucket")) {
 		var fileUploaderElem = $("<div id='file-uploader'/>");
-		input.parent().append(fileUploaderElem);
-
-		var hiddenInput = $("<input type='hidden'/>");
-		hiddenInput.attr("name", input.attr("name"));
-		hiddenInput.attr("value", input.attr("data-value"))
-		input.parent().append(hiddenInput);
-
+		
+		var parent = input.parent();
+		var name = input.attr("name");
+		
+		parent.append(fileUploaderElem);
 		input.detach();
 
 		var params = {};
@@ -16,15 +14,35 @@ function JappyConvertFileInput(input) {
 		else
 			params["bucket"] = input.attr("data-bucket");
 
+		var multiple = false;
+		if (input.attr("data-multiple")) {
+			multiple = true;
+		}
+		var json = false;
+		if (input.attr("data-json")) {
+			json = true;
+		}
+		
 		var uploader = new qq.FileUploader({
 			element : fileUploaderElem[0],
 			action : "/resource",
 			onComplete : function(id, fileName, responseJSON) {
-				this.hiddenInput.attr("value", responseJSON.value);
+				var hiddenInput = $("<input type='hidden'/>");
+				hiddenInput.attr("name", this.myname);
+				if (json) {
+					var o = {name : fileName, url : responseJSON.value };
+					hiddenInput.attr("value", JSON.stringify(o));
+				} else {
+					hiddenInput.attr("value", responseJSON.value);
+				}
+				this.myparent.append(hiddenInput);
 			},
 			debug : true,
 			params : params,
-			hiddenInput : hiddenInput
+			multiple : multiple,
+			myparent : parent,
+			myname : name,
+			myjson : json
 		});
 	}
 }

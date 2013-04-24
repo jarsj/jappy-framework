@@ -155,6 +155,8 @@ public class S3Sync {
 				
 				bufferStream.write(b);
 				bufferStream.write(NEW_LINE);
+				bytesWritten += b.length;
+				bytesWritten += NEW_LINE.length;
 			}
 			br.close();
 		}
@@ -167,12 +169,14 @@ public class S3Sync {
 
 		ObjectMetadata meta = new ObjectMetadata();
 		meta.setContentType("text/plain");
+		meta.setContentLength(bufferFile.length());
 		PutObjectRequest put = new PutObjectRequest(bucketName, bucketPath
 				+ prefix + "/" + prefix + "-" + ym + "-" + (++run), new FileInputStream(
 				bufferFile), meta);
 		PutObjectResult result = s3.putObject(put);
 		System.out.println("Uploaded to S3 " + result.getVersionId());
 		
+		bytesWritten = 0;
 		bufferFile = File.createTempFile(prefix, "buffer");
 		bufferStream = new FileOutputStream(bufferFile);
 	}

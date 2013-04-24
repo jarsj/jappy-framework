@@ -5,12 +5,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.*;
-import javax.security.cert.CertificateException;
-import javax.security.cert.X509Certificate;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -26,8 +25,8 @@ import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.util.EntityUtils;
-import org.apache.log4j.Logger;
 import org.json.JSONObject;
 
 /**
@@ -36,13 +35,12 @@ import org.json.JSONObject;
  * 
  */
 @WebServlet("/crawler/*")
-public class Crawler extends HttpServlet implements Runnable {
+public class Crawler extends HttpServlet {
 	private ConcurrentHashMap<String, CrawlHandler> handlers;
 	private ConcurrentHashMap<String, CrawlStats> stats;
 	private static final Crawler INSTANCE = new Crawler();
 	private DefaultHttpClient httpClient;
 	private ScheduledExecutorService background;
-	private ScheduledFuture<?> future;
 	private Log LOG;
 
 	private Crawler() {
@@ -55,23 +53,27 @@ public class Crawler extends HttpServlet implements Runnable {
 	}
 
 	public void start() {
-		if (!Cache.getInstance().isRunning()) {
-			LOG.error("Cache is not configured");
-			throw new IllegalStateException(
-					"Crawling won't start unless cache is configured");
-		}
+		start(5);
+	}
+
+	public void start(int connections) {
 		Table.get("crawl_queue").columns(Column.bigInteger("id", true),//
 				Column.text("url", 512),//
 				Column.integer("priority"),//
 				Column.longtext("metadata")).indexes(Index.create("priority"))
 				.create();
 
-		httpClient = (DefaultHttpClient) wrapClient(new DefaultHttpClient());
-		background = Executors.newSingleThreadScheduledExecutor();
+		ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager();
+		cm.setMaxTotal(connections);
+		cm.setDefaultMaxPerRoute(connections);
+
+		httpClient = (DefaultHttpClient) wrapClient(new DefaultHttpClient(cm));
+		background = Executors.newScheduledThreadPool(connections);
 		stats = new ConcurrentHashMap<String, CrawlStats>();
-		future = background
-				.scheduleWithFixedDelay(this, 0, 1, TimeUnit.SECONDS);
-		LOG.info("CrawlerConstrucor called again");
+		for (int i = 0; i < connections; i++) {
+			background.scheduleWithFixedDelay(new CrawlJob(), 0, 100,
+					TimeUnit.MILLISECONDS);
+		}
 	}
 
 	private HttpClient wrapClient(HttpClient base) {
@@ -122,7 +124,7 @@ public class Crawler extends HttpServlet implements Runnable {
 	}
 
 	public void schedule(Job j) throws Exception {
-		if (future == null)
+		if (background.isShutdown())
 			throw new IllegalStateException(
 					"Scheduling job when there is no crawler running");
 		LOG.info("Scheduling job url=" + j.getUrl());
@@ -165,6 +167,8 @@ public class Crawler extends HttpServlet implements Runnable {
 	private String lookupCache(Job j) throws Exception {
 		if (j.getCacheKey() == null)
 			return null;
+		if (!Cache.getInstance().isRunning())
+			return null;
 		return Cache.getInstance().fetch(j.getCacheKey(), null);
 	}
 
@@ -188,91 +192,99 @@ public class Crawler extends HttpServlet implements Runnable {
 			EntityUtils.consume(response.getEntity());
 		}
 
-		if (data != null && j.getCacheKey() != null) {
+		if (data != null && j.getCacheKey() != null
+				&& Cache.getInstance().isRunning()) {
 			Cache.getInstance().store(j.getCacheKey(), data, j.getExpiry());
 		}
 
 		return data;
 	}
 
-	@Override
-	public void run() {
-		try {
-			LOG.trace("new-crawl-run");
-			Row r = Table.get("crawl_queue").limit(1).ascending("priority")
-					.row();
-			if (r == null)
-				return;
-			Job j = new Job((String) r.column("url"),
-					r.columnAsInt("priority"), null);
-			JSONObject o = new JSONObject(r.columnAsString("metadata"));
-			j.setMetadata(o);
+	class CrawlJob implements Runnable {
 
-			while (j != null) {
-				LOG.info("new-crawl-job url=" + j.getUrl());
-				CrawlStats cstats = stats.get(j.getCategory());
-				if (cstats == null) {
-					cstats = new CrawlStats();
-					stats.put(j.getCacheKey(), cstats);
+		@Override
+		public void run() {
+			try {
+				LOG.trace("new-crawl-run");
+				Row r = null;
+				synchronized (Crawler.class) {
+					r = Table.get("crawl_queue").limit(1)
+							.ascending("priority").row();
+					if (r == null)
+						return;
+					Table.get("crawl_queue").where("id", r.columnAsLong("id"))
+							.delete();
 				}
-				cstats.total.incrementAndGet();
-				boolean cacheHit = false;
-				try {
-					LOG.info("begin-crawl url=" + j.getUrl() + " tag="
-							+ j.getTag() + " handler="
-							+ handlers.get(j.getTag()));
-					String data = lookupCache(j);
-					if (data == null) {
-						LOG.info("cache-miss url=" + j.getUrl());
-						data = internalFetchAndCache(j);
-						cstats.crawled.incrementAndGet();
-					} else {
-						cacheHit = true;
-						cstats.cache.incrementAndGet();
+				Job j = new Job((String) r.column("url"),
+						r.columnAsInt("priority"), null);
+				JSONObject o = new JSONObject(r.columnAsString("metadata"));
+				j.setMetadata(o);
+
+				while (j != null) {
+					LOG.info("new-crawl-job url=" + j.getUrl());
+					CrawlStats cstats = stats.get(j.getCategory());
+					if (cstats == null) {
+						cstats = new CrawlStats();
+						stats.put(j.getCacheKey(), cstats);
+					}
+					cstats.total.incrementAndGet();
+					boolean cacheHit = false;
+					try {
+						LOG.info("begin-crawl url=" + j.getUrl() + " tag="
+								+ j.getTag() + " handler="
+								+ handlers.get(j.getTag()));
+						String data = lookupCache(j);
+						if (data == null) {
+							LOG.info("cache-miss url=" + j.getUrl());
+							data = internalFetchAndCache(j);
+							cstats.crawled.incrementAndGet();
+						} else {
+							cacheHit = true;
+							cstats.cache.incrementAndGet();
+						}
+
+						if (handlers.containsKey(j.getTag()))
+							try {
+								handlers.get(j.getTag()).ready(j, data);
+							} catch (Throwable t) {
+								LOG.error("Error in parsing", t);
+							}
+						else
+							LOG.warn("Missing Handler for url=" + j.getUrl()
+									+ " tag=" + j.getTag());
+					} catch (Throwable t) {
+						if (handlers.containsKey(j.getTag()))
+							handlers.get(j.getTag()).ready(j, null);
+						else
+							LOG.warn("Missing Handler for url=" + j.getUrl()
+									+ " tag=" + j.getTag());
+						LOG.error("crawl-failed url=" + j.getUrl(), t);
+						cstats.errors.incrementAndGet();
 					}
 
-					if (handlers.containsKey(j.getTag()))
-						try {
-							handlers.get(j.getTag()).ready(j, data);
-						} catch (Throwable t) {
-							LOG.error("Error in parsing", t);
+					Table.get("crawl_queue").where("id", r.columnAsLong("id"))
+							.delete();
+
+					// If we got a cache hit let's try crawling one more time.
+					if (cacheHit) {
+						r = Table.get("crawl_queue").limit(1)
+								.ascending("priority").row();
+						if (r != null) {
+							j = new Job((String) r.column("url"),
+									r.columnAsInt("priority"), null);
+							j.setMetadata(new JSONObject(r
+									.columnAsString("metadata")));
+						} else {
+							break;
 						}
-					else
-						LOG.warn("Missing Handler for url=" + j.getUrl()
-								+ " tag=" + j.getTag());
-				} catch (Throwable t) {
-					if (handlers.containsKey(j.getTag()))
-						handlers.get(j.getTag()).ready(j, null);
-					else
-						LOG.warn("Missing Handler for url=" + j.getUrl()
-								+ " tag=" + j.getTag());
-					LOG.error("crawl-failed url=" + j.getUrl(), t);
-					cstats.errors.incrementAndGet();
-				}
-
-				Table.get("crawl_queue").where("id", r.columnAsLong("id"))
-						.delete();
-
-				// If we got a cache hit let's try crawling one more time.
-				if (cacheHit) {
-					r = Table.get("crawl_queue").limit(1).ascending("priority")
-							.row();
-					if (r != null) {
-						j = new Job((String) r.column("url"),
-								r.columnAsInt("priority"), null);
-						j.setMetadata(new JSONObject(r
-								.columnAsString("metadata")));
 					} else {
 						break;
 					}
-				} else {
-					break;
 				}
+			} catch (Exception e) {
+				LOG.error(e.getMessage(), e);
+				throw new IllegalStateException(e);
 			}
-		} catch (Exception e) {
-			future = null;
-			LOG.error(e.getMessage(), e);
-			throw new IllegalStateException(e);
 		}
 	}
 
