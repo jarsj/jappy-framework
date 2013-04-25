@@ -45,7 +45,7 @@ public class DB {
 		bds.setTestOnBorrow(true);
 		bds.setValidationQuery("SELECT 1");
 		INSTANCE.mDS = bds;
-
+		
 		Table.get("_metadata")
 				.columns(Column.text("table", 100),
 						Column.mediumtext("metadata")).primary("table")
