@@ -40,6 +40,10 @@ public class Cloud {
 		credentials = new BasicAWSCredentials(accessKey, secretKey);
 		reloadBuckets();
 	}
+	
+	public static AWSCredentials getCredentials() {
+		return credentials;
+	}
 
 	private static void reloadBuckets() {
 		mBuckets = new ConcurrentHashMap<String, Boolean>();

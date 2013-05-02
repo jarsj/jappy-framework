@@ -1,6 +1,7 @@
 package com.crispy;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -26,6 +27,9 @@ import org.apache.http.conn.scheme.Scheme;
 import org.apache.http.conn.scheme.SchemeRegistry;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
 
@@ -53,25 +57,30 @@ public class Crawler extends HttpServlet {
 	}
 
 	public void start() {
-		start(5);
+		start(1, 30, 100);
 	}
 
-	public void start(int connections) {
+	public void start(int connections, int timeout_in_seconds, int delay_in_milliseconds) {
 		Table.get("crawl_queue").columns(Column.bigInteger("id", true),//
 				Column.text("url", 512),//
 				Column.integer("priority"),//
 				Column.longtext("metadata")).indexes(Index.create("priority"))
 				.create();
-
+		
+		HttpParams params = new BasicHttpParams();
+		HttpConnectionParams.setConnectionTimeout(params, timeout_in_seconds * 1000);
+		HttpConnectionParams.setSoTimeout(params, timeout_in_seconds * 1000);
+		
 		ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager();
 		cm.setMaxTotal(connections);
-		cm.setDefaultMaxPerRoute(connections);
+		cm.setDefaultMaxPerRoute(2);
 
-		httpClient = (DefaultHttpClient) wrapClient(new DefaultHttpClient(cm));
+		httpClient = (DefaultHttpClient) wrapClient(new DefaultHttpClient(cm, params));
+		
 		background = Executors.newScheduledThreadPool(connections);
 		stats = new ConcurrentHashMap<String, CrawlStats>();
 		for (int i = 0; i < connections; i++) {
-			background.scheduleWithFixedDelay(new CrawlJob(), 0, 100,
+			background.scheduleWithFixedDelay(new CrawlJob(), 0, delay_in_milliseconds,
 					TimeUnit.MILLISECONDS);
 		}
 	}
@@ -189,6 +198,7 @@ public class Crawler extends HttpServlet {
 				EntityUtils.consume(entity);
 			}
 		} else {
+			LOG.error(response.getStatusLine().getStatusCode() + ":" + response.getStatusLine().getReasonPhrase());
 			EntityUtils.consume(response.getEntity());
 		}
 
@@ -298,6 +308,15 @@ public class Crawler extends HttpServlet {
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
 			throws ServletException, IOException {
+	}
+
+	public void removeHandler(CrawlHandler handler) {
+		Iterator<Map.Entry<String, CrawlHandler>> iter = handlers.entrySet().iterator();
+		while (iter.hasNext()) {
+			Map.Entry<String, CrawlHandler> entry = iter.next();
+			if (entry.getValue() == handler)
+				iter.remove();
+		}
 	}
 
 }

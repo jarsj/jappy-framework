@@ -5,6 +5,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -550,8 +551,8 @@ public class Table {
 				sb.append(StringUtils.join(updates, ','));
 			}
 
-			PreparedStatement pstmt = con.prepareStatement(sb.toString());
-
+			PreparedStatement pstmt = con.prepareStatement(sb.toString(), Statement.RETURN_GENERATED_KEYS);
+			
 			int c = 1;
 			for (Object value : values) {
 				pstmt.setObject(c++, value);

@@ -145,4 +145,9 @@ public class Job {
 		JSONObject o = new JSONObject("{'headers':{}}");
 		System.out.println(JSONObject.getNames(o.getJSONObject("headers")));
 	}
+	
+	@Override
+	public String toString() {
+		return "url=" + url + " tag=" + tag;
+	}
 }
