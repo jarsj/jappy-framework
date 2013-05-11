@@ -35,6 +35,7 @@ public class Cloud {
 	private static AWSCredentials credentials;
 	private static ConcurrentHashMap<String, Boolean> mBuckets;
 	private Set<String> keys;
+	private boolean neverExpire;
 
 	public static void init(String accessKey, String secretKey) {
 		credentials = new BasicAWSCredentials(accessKey, secretKey);
@@ -91,6 +92,11 @@ public class Cloud {
 		acl.grantPermission(GroupGrantee.AllUsers, Permission.Read);
 		return this;
 	}
+	
+	public Cloud neverExpire() {
+		neverExpire = true;
+		return this;
+	}
 
 	public Cloud cacheKeys() {
 		keys = new TreeSet<String>();
@@ -121,6 +127,10 @@ public class Cloud {
 		} else if (value.getName().endsWith("jpg")) {
 			metadata.setContentType("image/jpg");
 		}
+		if (neverExpire) {
+			metadata.setCacheControl("max-age=86400");
+		}
+		
 		PutObjectRequest request = new PutObjectRequest(bucket, key,
 				new FileInputStream(value), metadata);
 		if (acl != null) {
@@ -142,6 +152,9 @@ public class Cloud {
 				metadata.setContentType("image/png");
 			} else if (url.endsWith("jpg")) {
 				metadata.setContentType("image/jpg");
+			}
+			if (neverExpire) {
+				metadata.setCacheControl("max-age=86400");
 			}
 			PutObjectRequest request = new PutObjectRequest(bucket, key,
 					entity.getContent(), metadata);

@@ -127,7 +127,7 @@ public class Image extends HttpServlet {
 
 		File tmp = File.createTempFile("image", ext);
 		IOUtils.copy(input, new FileOutputStream(tmp));
-		Cloud.s3(bucket).create().allowRead()
+		Cloud.s3(bucket).create().allowRead().neverExpire()
 				.upload(parent + nextID + "." + ext, tmp);
 		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID
 				+ "." + ext;

@@ -12,18 +12,16 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Table {
 	public enum EngineType {
-		MY_ISAM("MyISAM"), MEMORY("MEMORY"), HEAP("HEAP"), MERGE("MERGE"), MRG_MYISAM(
-				"MRG_MYISAM"), ISAM("ISAM"), MRG_ISAM("MRG_ISAM"), INNODB(
-				"InnoDB"), INNOBASE("INNOBASE"), BDB("BDB"), BERKELEYDB(
-				"BERKELEYDB"), NDBCLUSTER("NDBCLUSTER"), NDB("NDB"), EXAMPLE(
-				"EXAMPLE"), ARCHIVE("ARCHIVE"), CSV("CSV"), FEDERATED(
-				"FEDERATED"), BLACKHOLE("BLACKHOLE");
+		MY_ISAM("MyISAM"), MEMORY("MEMORY"), HEAP("HEAP"), MERGE("MERGE"), MRG_MYISAM("MRG_MYISAM"), ISAM("ISAM"), MRG_ISAM("MRG_ISAM"), INNODB(
+				"InnoDB"), INNOBASE("INNOBASE"), BDB("BDB"), BERKELEYDB("BERKELEYDB"), NDBCLUSTER("NDBCLUSTER"), NDB("NDB"), EXAMPLE("EXAMPLE"), ARCHIVE(
+				"ARCHIVE"), CSV("CSV"), FEDERATED("FEDERATED"), BLACKHOLE("BLACKHOLE");
 
 		String engineType;
 
@@ -37,8 +35,7 @@ public class Table {
 	}
 
 	public enum WhereOp {
-		EQUALS("="), NOT_EQUALS("!="), GREATER_THAN(">"), LESS_THAN("<"), LIKE(
-				" LIKE ");
+		EQUALS("="), NOT_EQUALS("!="), GREATER_THAN(">"), LESS_THAN("<"), LIKE(" LIKE ");
 
 		String sqlOp;
 
@@ -52,9 +49,7 @@ public class Table {
 	}
 
 	public enum MatchMode {
-		IN_BOOLEAN_MODE("IN BOOLEAN MODE"), IN_NATURAL_LANGUAGE_MODE(
-				"IN NATURAL LANGUAGE MODE"), WITH_QUERY_EXPANSION(
-				"WITH QUERY EXPANSION");
+		IN_BOOLEAN_MODE("IN BOOLEAN MODE"), IN_NATURAL_LANGUAGE_MODE("IN NATURAL LANGUAGE MODE"), WITH_QUERY_EXPANSION("WITH QUERY EXPANSION");
 
 		String mode;
 
@@ -76,8 +71,7 @@ public class Table {
 		String exp;
 		Object values[];
 
-		static WhereExp operator(String table, WhereOp op, String column,
-				Object value) {
+		static WhereExp operator(String table, WhereOp op, String column, Object value) {
 			WhereExp where = new WhereExp();
 			where.exp = table + ".`" + column + "`" + op.sqlOp() + "?";
 			where.values = new Object[1];
@@ -87,12 +81,7 @@ public class Table {
 
 		static WhereExp in(String table, String column, Object value[]) {
 			WhereExp where = new WhereExp();
-			where.exp = table
-					+ ".`"
-					+ column
-					+ "` IN ("
-					+ StringUtils.join(Collections.nCopies(value.length, "?"),
-							",") + ")";
+			where.exp = table + ".`" + column + "` IN (" + StringUtils.join(Collections.nCopies(value.length, "?"), ",") + ")";
 			where.values = new Object[value.length];
 			for (int i = 0; i < value.length; i++) {
 				where.values[i] = value[i];
@@ -100,19 +89,24 @@ public class Table {
 			return where;
 		}
 
-		static WhereExp matchAgainst(String table, String[] columns,
-				String[] value, MatchMode mode) {
+		static WhereExp notIn(String table, String column, Object value[]) {
 			WhereExp where = new WhereExp();
-			StringBuilder match = new StringBuilder(table + ".`" + columns[0]
-					+ "`");
+			where.exp = table + ".`" + column + "` NOT IN (" + StringUtils.join(Collections.nCopies(value.length, "?"), ",") + ")";
+			where.values = new Object[value.length];
+			for (int i = 0; i < value.length; i++) {
+				where.values[i] = value[i];
+			}
+			return where;
+		}
+
+		static WhereExp matchAgainst(String table, String[] columns, String[] value, MatchMode mode) {
+			WhereExp where = new WhereExp();
+			StringBuilder match = new StringBuilder(table + ".`" + columns[0] + "`");
 			for (int i = 1; i < columns.length; i++) {
 				match.append("," + table + ".`" + columns[i] + "`");
 			}
-			where.exp = "MATCH ("
-					+ match.toString()
-					+ ") AGAINST ("
-					+ StringUtils.join(Collections.nCopies(value.length, "?"),
-							" ") + " " + mode.sqlMatchMode() + ")";
+			where.exp = "MATCH (" + match.toString() + ") AGAINST (" + StringUtils.join(Collections.nCopies(value.length, "?"), " ") + " "
+					+ mode.sqlMatchMode() + ")";
 			where.values = new Object[value.length];
 			for (int i = 0; i < value.length; i++) {
 				where.values[i] = value[i];
@@ -144,7 +138,7 @@ public class Table {
 
 	private int limit;
 
-	private String orderBy;
+	private String[] orderBy;
 
 	private JSONObject comment;
 
@@ -185,6 +179,7 @@ public class Table {
 		limit = -1;
 		start = -1;
 		this.name = name;
+		orderBy = new String[0];
 		joins = new ArrayList<Table>();
 		where = new ArrayList<Table.WhereExp>();
 		joins.add(this);
@@ -247,36 +242,27 @@ public class Table {
 				for (Column column : newColumns) {
 					defs.addAll(Arrays.asList(column.createDefinitions()));
 				}
-				DB.updateQuery("CREATE TABLE `" + name + "` ("
-						+ StringUtils.join(defs, ',') + ")");
+				DB.updateQuery("CREATE TABLE `" + name + "` (" + StringUtils.join(defs, ',') + ")");
 				if (!name.equals("_metadata")) {
-					Table.get("_metadata").columns("table", "metadata")
-							.values(name, comment.toString())
-							.overwrite("metadata").add();
+					Table.get("_metadata").columns("table", "metadata").values(name, comment.toString()).overwrite("metadata").add();
 				}
 			} else {
 				for (Column column : newColumns) {
-					Column oldColumn = Column
-							.findByName(m.columns, column.name);
+					Column oldColumn = Column.findByName(m.columns, column.name);
 					if (oldColumn == null) {
-						DB.updateQuery("ALTER TABLE `" + name + "` ADD COLUMN "
-								+ column.createDefinitions());
+						DB.updateQuery("ALTER TABLE `" + name + "` ADD COLUMN " + column.createDefinitions());
 					} else {
 						if (!oldColumn.equals(column)) {
-							DB.updateQuery("ALTER TABLE `" + name
-									+ "` MODIFY COLUMN "
-									+ column.createDefinitions());
+							DB.updateQuery("ALTER TABLE `" + name + "` MODIFY COLUMN " + column.createDefinitions());
 						}
 					}
 				}
 
 				if (deleteOldColumns) {
 					for (Column oldColumn : m.columns) {
-						Column newColumn = Column.findByName(newColumns,
-								oldColumn.name);
+						Column newColumn = Column.findByName(newColumns, oldColumn.name);
 						if (newColumn == null) {
-							DB.updateQuery("ALTER TABLE `" + name
-									+ "` DROP COLUMN `" + oldColumn.name + "`");
+							DB.updateQuery("ALTER TABLE `" + name + "` DROP COLUMN `" + oldColumn.name + "`");
 						}
 					}
 				}
@@ -288,15 +274,12 @@ public class Table {
 						String key = keys.next();
 						merged.put(key, comment.get(key));
 					}
-					Table.get("_metadata").columns("table", "metadata")
-							.values(name, merged.toString())
-							.overwrite("metadata").add();
+					Table.get("_metadata").columns("table", "metadata").values(name, merged.toString()).overwrite("metadata").add();
 				}
 			}
 
 			if (engineType != null) {
-				DB.updateQuery("ALTER TABLE `" + name + "` ENGINE = "
-						+ engineType.getType());
+				DB.updateQuery("ALTER TABLE `" + name + "` ENGINE = " + engineType.getType());
 			}
 			if (newIndexes == null)
 				newIndexes = new ArrayList<Index>();
@@ -304,13 +287,10 @@ public class Table {
 			for (Index i : newIndexes) {
 				Index oldIndex = (m == null) ? null : m.getIndex(i.name);
 				if (oldIndex == null) {
-					DB.updateQuery("ALTER TABLE `" + name + "` ADD "
-							+ i.createDefinition());
+					DB.updateQuery("ALTER TABLE `" + name + "` ADD " + i.createDefinition());
 				} else if (!oldIndex.equals(i)) {
-					DB.updateQuery("ALTER TABLE `" + name + "` DROP INDEX `"
-							+ oldIndex.name + "`");
-					DB.updateQuery("ALTER TABLE `" + name + "` ADD "
-							+ i.createDefinition());
+					DB.updateQuery("ALTER TABLE `" + name + "` DROP INDEX `" + oldIndex.name + "`");
+					DB.updateQuery("ALTER TABLE `" + name + "` ADD " + i.createDefinition());
 					LOG.info("CREATING NEW INDEX " + i.createDefinition());
 				}
 			}
@@ -319,8 +299,7 @@ public class Table {
 				for (Index i : m.indexes) {
 					Index newIndex = Index.findByName(newIndexes, i.name);
 					if (newIndex == null) {
-						DB.updateQuery("ALTER TABLE `" + name
-								+ "` DROP INDEX `" + i.name + "`");
+						DB.updateQuery("ALTER TABLE `" + name + "` DROP INDEX `" + i.name + "`");
 					}
 				}
 			}
@@ -329,8 +308,7 @@ public class Table {
 				newConstraints = new ArrayList<Constraint>();
 
 			for (Constraint c : newConstraints) {
-				Constraint old = (m == null) ? null : m
-						.getConstraint(c.sourceColumn);
+				Constraint old = (m == null) ? null : m.getConstraint(c.sourceColumn);
 				if (old == null) {
 					c.create(name);
 				} else if (!old.equals(c)) {
@@ -357,22 +335,16 @@ public class Table {
 				Index oldPrimary = (m == null) ? null : m.primary;
 				if (oldPrimary == null) {
 					if (!newPrimaryKey.isAuto)
-						DB.updateQuery("ALTER TABLE `" + name
-								+ "` ADD PRIMARY KEY "
-								+ newPrimaryKey.createDefinition());
+						DB.updateQuery("ALTER TABLE `" + name + "` ADD PRIMARY KEY " + newPrimaryKey.createDefinition());
 				} else if (!oldPrimary.equals(newPrimaryKey)) {
-					DB.updateQuery("ALTER TABLE `" + name
-							+ "` DROP PRIMARY KEY");
+					DB.updateQuery("ALTER TABLE `" + name + "` DROP PRIMARY KEY");
 					if (!newPrimaryKey.isAuto)
-						DB.updateQuery("ALTER TABLE `" + name
-								+ "` ADD PRIMARY KEY "
-								+ newPrimaryKey.createDefinition());
+						DB.updateQuery("ALTER TABLE `" + name + "` ADD PRIMARY KEY " + newPrimaryKey.createDefinition());
 				}
 			} else {
 				if (m != null) {
 					if (m.primary != null) {
-						DB.updateQuery("ALTER TABLE `" + name
-								+ "` DROP PRIMARY KEY");
+						DB.updateQuery("ALTER TABLE `" + name + "` DROP PRIMARY KEY");
 					}
 				}
 			}
@@ -433,8 +405,7 @@ public class Table {
 			String columnName = columnNames.get(i);
 			Column c = Column.findByName(m.columns, columnName);
 			if (c == null) {
-				throw new IllegalStateException("Missing column " + columnName
-						+ " in table " + name);
+				throw new IllegalStateException("Missing column " + columnName + " in table " + name);
 			}
 			this.values.add(c.parseObject(values[i]));
 		}
@@ -482,8 +453,7 @@ public class Table {
 			}
 			if (increments != null) {
 				for (UpdateExp ue : increments) {
-					updates.add(String.format("`%s`=`%s`+?", ue.column,
-							ue.column));
+					updates.add(String.format("`%s`=`%s`+?", ue.column, ue.column));
 				}
 			}
 			sb.append(StringUtils.join(updates, ','));
@@ -532,14 +502,9 @@ public class Table {
 			long genId = -1;
 
 			StringBuilder sb = new StringBuilder();
-			sb.append("INSERT "
-					+ (((overwriteColumns != null) || ignore) ? "IGNORE " : "")
-					+ "INTO `" + name + "`(");
+			sb.append("INSERT " + (((overwriteColumns != null) || ignore) ? "IGNORE " : "") + "INTO `" + name + "`(");
 			sb.append(safeJoin(columnNames));
-			sb.append(") VALUES ("
-					+ StringUtils.join(
-							Collections.nCopies(columnNames.size(), "?"), ',')
-					+ ")");
+			sb.append(") VALUES (" + StringUtils.join(Collections.nCopies(columnNames.size(), "?"), ',') + ")");
 
 			if (overwriteColumns != null && overwriteColumns.size() > 0) {
 				sb.append(" ON DUPLICATE KEY UPDATE ");
@@ -552,7 +517,7 @@ public class Table {
 			}
 
 			PreparedStatement pstmt = con.prepareStatement(sb.toString(), Statement.RETURN_GENERATED_KEYS);
-			
+
 			int c = 1;
 			for (Object value : values) {
 				pstmt.setObject(c++, value);
@@ -579,8 +544,7 @@ public class Table {
 		}
 	}
 
-	private PreparedStatement createJoinSelectstatement(Connection con,
-			boolean count) throws SQLException {
+	private PreparedStatement createJoinSelectstatement(Connection con, boolean count) throws SQLException {
 		StringBuilder sb = new StringBuilder();
 		sb.append("SELECT ");
 
@@ -624,8 +588,7 @@ public class Table {
 				if (c == null)
 					c = Constraint.to(m2.constraints, t1.name);
 
-				joinCondition.add("`" + c.sourceTable + "`.`" + c.sourceColumn
-						+ "`=`" + c.destTable + "`.`" + c.destColumn + "`");
+				joinCondition.add("`" + c.sourceTable + "`.`" + c.sourceColumn + "`=`" + c.destTable + "`.`" + c.destColumn + "`");
 			}
 			sb.append(StringUtils.join(joinCondition, ","));
 		}
@@ -650,8 +613,12 @@ public class Table {
 		}
 
 		for (Table t : joins) {
-			if (t.orderBy != null) {
-				sb.append(" ORDER BY `" + t.name + "`." + t.orderBy);
+			if (t.orderBy.length > 0) {
+				String[] temp = new String[t.orderBy.length];
+				for (int i = 0; i < t.orderBy.length; i++) {
+					temp[i] = "`" + t.name + "`." + t.orderBy[i]; 
+				}
+				sb.append(" ORDER BY " + StringUtils.join(temp, ","));
 				break;
 			}
 		}
@@ -679,8 +646,7 @@ public class Table {
 		return name;
 	}
 
-	private PreparedStatement createSelectStatement(Connection con,
-			boolean count) throws SQLException {
+	private PreparedStatement createSelectStatement(Connection con, boolean count) throws SQLException {
 		if (joins.size() > 1)
 			return createJoinSelectstatement(con, count);
 		StringBuilder sb = new StringBuilder();
@@ -710,10 +676,10 @@ public class Table {
 			sb.append(" GROUP BY `" + groupBy + "`");
 		}
 
-		if (orderBy != null) {
-			sb.append(" ORDER BY " + orderBy);
+		if (orderBy.length > 0) {
+			sb.append(" ORDER BY " + StringUtils.join(orderBy, ","));
 		}
-		if (orderBy == null && random) {
+		if (orderBy.length == 0 && random) {
 			sb.append(" ORDER BY RAND()");
 		}
 		if (limit != -1) {
@@ -790,7 +756,7 @@ public class Table {
 			}
 		}
 	}
-	
+
 	public void unlock() {
 		Connection con = DB.getConnection();
 		try {
@@ -805,6 +771,17 @@ public class Table {
 			} catch (Throwable t) {
 			}
 		}
+	}
+
+	public String[] strings() {
+		if (columnNames.size() != 1)
+			throw new IllegalArgumentException("Only one column can be returned as array");
+		List<Row> rows = rows();
+		String[] ret = new String[rows.size()];
+		for (int i = 0; i < rows.size(); i++) {
+			ret[i] = rows.get(i).columnAsString(columnNames.get(0));
+		}
+		return ret;
 	}
 
 	public List<Row> rows() {
@@ -859,12 +836,25 @@ public class Table {
 		return where(column, value, WhereOp.EQUALS);
 	}
 
-	public Table where(String column, Object value[]) {
+	public Table notIn(String column, Object value[]) {
 		Metadata m = DB.getMetadata(name);
 		Column c = Column.findByName(m.columns, column);
 		if (c == null) {
-			throw new IllegalStateException("No column exists for " + column
-					+ " in table " + name);
+			throw new IllegalStateException("No column exists for " + column + " in table " + name);
+		}
+		Object[] parsed = new Object[value.length];
+		for (int i = 0; i < value.length; i++) {
+			parsed[i] = c.parseObject(value[i]);
+		}
+		where.add(WhereExp.notIn(name, column, parsed));
+		return this;
+	}
+
+	public Table in(String column, Object value[]) {
+		Metadata m = DB.getMetadata(name);
+		Column c = Column.findByName(m.columns, column);
+		if (c == null) {
+			throw new IllegalStateException("No column exists for " + column + " in table " + name);
 		}
 		Object[] parsed = new Object[value.length];
 		for (int i = 0; i < value.length; i++) {
@@ -877,25 +867,21 @@ public class Table {
 	public Table search(String[] columns, String query, MatchMode mode) {
 		Metadata m = DB.getMetadata(name);
 		if (columns.length == 0) {
-			throw new IllegalStateException(
-					"Not a single column available to match");
+			throw new IllegalStateException("Not a single column available to match");
 		}
 		for (int i = 0; i < columns.length; i++) {
 			Column c = Column.findByName(m.columns, columns[i]);
 			if (c == null) {
-				throw new IllegalStateException("No column exists for " + c
-						+ " in table " + name);
+				throw new IllegalStateException("No column exists for " + c + " in table " + name);
 			}
 		}
 		if (query == null || query.equals("")) {
-			throw new IllegalStateException(
-					"No keyword available to match against");
+			throw new IllegalStateException("No keyword available to match against");
 		}
 		if (mode == null) {
 			mode = MatchMode.IN_NATURAL_LANGUAGE_MODE;
 		}
-		where.add(WhereExp.matchAgainst(name, columns, new String[] { query },
-				mode));
+		where.add(WhereExp.matchAgainst(name, columns, new String[] { query }, mode));
 		return this;
 	}
 
@@ -905,8 +891,7 @@ public class Table {
 			throw new IllegalStateException("No table exists for " + name);
 		Column c = Column.findByName(m.columns, column);
 		if (c == null) {
-			throw new IllegalStateException("No column exists for " + column
-					+ " in table " + name);
+			throw new IllegalStateException("No column exists for " + column + " in table " + name);
 		}
 		where.add(WhereExp.operator(name, op, column, c.parseObject(value)));
 		return this;
@@ -953,8 +938,7 @@ public class Table {
 
 	public Table lastNDays(String column, int N) {
 		WhereExp exp = new WhereExp();
-		exp.exp = "(DATE(`" + column + "`)<=CURRENT_DATE() AND DATE(`" + column
-				+ "`)>=DATE_SUB(CURRENT_DATE(), INTERVAL " + N + " DAY))";
+		exp.exp = "(DATE(`" + column + "`)<=CURRENT_DATE() AND DATE(`" + column + "`)>=DATE_SUB(CURRENT_DATE(), INTERVAL " + N + " DAY))";
 		exp.values = new Object[0];
 		where.add(exp);
 		return this;
@@ -962,8 +946,7 @@ public class Table {
 
 	public Table nextNDays(String column, int N) {
 		WhereExp exp = new WhereExp();
-		exp.exp = "(DATE(`" + column + "`)>CURRENT_DATE() AND DATE(`" + column
-				+ "`)<=DATE_ADD(CURRENT_DATE(), INTERVAL " + N + " DAY))";
+		exp.exp = "(DATE(`" + column + "`)>CURRENT_DATE() AND DATE(`" + column + "`)<=DATE_ADD(CURRENT_DATE(), INTERVAL " + N + " DAY))";
 		exp.values = new Object[0];
 		where.add(exp);
 		return this;
@@ -980,12 +963,12 @@ public class Table {
 	}
 
 	public Table ascending(String column) {
-		this.orderBy = "`" + column + "` ASC";
+		orderBy = (String[])ArrayUtils.add(orderBy, "`" + column + "` ASC");
 		return this;
 	}
 
 	public Table descending(String column) {
-		this.orderBy = column + " DESC";
+		orderBy = (String[])ArrayUtils.add(orderBy, "`" + column + "` DESC");
 		return this;
 	}
 
@@ -1016,8 +999,7 @@ public class Table {
 		}
 	}
 
-	private int whereValues(PreparedStatement pstmt, int ctr)
-			throws SQLException {
+	private int whereValues(PreparedStatement pstmt, int ctr) throws SQLException {
 		for (WhereExp exp : where) {
 			for (Object value : exp.values) {
 				pstmt.setObject(ctr++, value);
