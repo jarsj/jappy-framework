@@ -128,7 +128,7 @@ public class Cloud {
 			metadata.setContentType("image/jpg");
 		}
 		if (neverExpire) {
-			metadata.setCacheControl("max-age=86400");
+			metadata.setCacheControl("max-age=8640000");
 		}
 		
 		PutObjectRequest request = new PutObjectRequest(bucket, key,
@@ -154,7 +154,7 @@ public class Cloud {
 				metadata.setContentType("image/jpg");
 			}
 			if (neverExpire) {
-				metadata.setCacheControl("max-age=86400");
+				metadata.setCacheControl("max-age=8640000");
 			}
 			PutObjectRequest request = new PutObjectRequest(bucket, key,
 					entity.getContent(), metadata);
