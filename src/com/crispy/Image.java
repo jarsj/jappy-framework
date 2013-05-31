@@ -1,7 +1,6 @@
 package com.crispy;
 
 import java.awt.image.BufferedImage;
-import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -143,7 +142,7 @@ public class Image extends HttpServlet {
 	}
 	
 	public static int[] dimensions(URL source) throws IOException {
-		BufferedImage image = ImageIO.read(source);
+		BufferedImage image = ImageIO.read(Cache.getInstance().fetchUrl(source));
 		if (image == null) {
 			return new int[]{-1,-1};
 		}
@@ -162,13 +161,13 @@ public class Image extends HttpServlet {
 			throws IOException {
 		String extension = source.getPath().substring(
 				source.getPath().lastIndexOf(".") + 1);
-		return internalScale(ImageIO.read(source), extension, width, height);
+		return internalScale(ImageIO.read(Cache.getInstance().fetchUrl(source)), extension, width, height);
 	}
 
 	public static File scale(URL source, int size) throws IOException {
 		String extension = source.getPath().substring(
 				source.getPath().lastIndexOf(".") + 1);
-		return internalScale(ImageIO.read(source), extension, size);
+		return internalScale(ImageIO.read(Cache.getInstance().fetchUrl(source)), extension, size);
 	}
 
 	private static File internalScale(BufferedImage image, String extension,

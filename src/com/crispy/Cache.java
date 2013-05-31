@@ -1,9 +1,21 @@
 package com.crispy;
 
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+
+import sun.util.LocaleServiceProviderPool.LocalizedObjectGetter;
+
 
 public class Cache {
+	
+	static Log LOG = Log.get("cache");
 
 	public enum Expire {
 		HOUR, TONIGHT, WEEKEND, MONTH;
@@ -25,17 +37,20 @@ public class Cache {
 
 	private static final Cache INSTANCE = new Cache();
 	private boolean isRunning;
+	private File cacheFolder;
 
 	public Cache() {
 		isRunning = false;
 	}
 
-	public void start() {
+	public void start(File folder) {
 		Table.get("cache")
 				.columns(Column.text("key", 512), Column.longtext("value"),
 						Column.timestamp("expires")).primary("key").create();
+		this.cacheFolder = folder;
 		isRunning = true;
 	}
+	
 
 	public String fetch(String key, String def) throws Exception {
 		String data = (String) DB
@@ -62,6 +77,11 @@ public class Cache {
 		store(key, value, e.expires());
 	}
 
+	public File fetchUrl(String url) throws IOException {
+		URL u = new URL(url); 
+		return fetchUrl(u);
+	}
+	
 	public void shutdown() {
 
 	}
@@ -72,5 +92,17 @@ public class Cache {
 
 	public boolean isRunning() {
 		return isRunning;
+	}
+
+	public File fetchUrl(URL u) throws IOException {
+		File f = new File(cacheFolder, u.getHost() + "/" + u.getPath());
+		if (f.exists()) {
+			LOG.debug("cache-hit u=" + u.toString());
+			return f;
+		}
+		LOG.debug("cache-miss u=" + u.toString());
+		FileUtils.copyURLToFile(u, f);
+		return f;
+
 	}
 }

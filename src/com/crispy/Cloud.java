@@ -41,7 +41,7 @@ public class Cloud {
 		credentials = new BasicAWSCredentials(accessKey, secretKey);
 		reloadBuckets();
 	}
-	
+
 	public static AWSCredentials getCredentials() {
 		return credentials;
 	}

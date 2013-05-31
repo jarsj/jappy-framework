@@ -35,7 +35,7 @@ public class Table {
 	}
 
 	public enum WhereOp {
-		EQUALS("="), NOT_EQUALS("!="), GREATER_THAN(">"), LESS_THAN("<"), LIKE(" LIKE ");
+		EQUALS("="), NOT_EQUALS("!="), GREATER_THAN(">"), LESS_THAN("<"), LIKE(" LIKE "), GREATER_THAN_EQUALS(">="), LESS_THAN_EQUALS("<=");
 
 		String sqlOp;
 
@@ -125,13 +125,14 @@ public class Table {
 	private ArrayList<WhereExp> where;
 	// private HashMap<String, Pair<WhereOp, Object>> where;
 	private ArrayList<String> columnNames;
+	private ArrayList<String> columnNamesToSkip;
 	private ArrayList<String> overwriteColumns;
 	private ArrayList<Column> newColumns;
 	private ArrayList<Index> newIndexes;
 	private ArrayList<Constraint> newConstraints;
 	private ArrayList<UpdateExp> increments;
-
 	private Index newPrimaryKey;
+	private Row copy;
 
 	private ArrayList<Object> values;
 	private boolean deleteOldColumns;
@@ -153,6 +154,8 @@ public class Table {
 	private String groupBy;
 
 	private EngineType engineType;
+
+	private String max;
 
 	public static Table get(String name) {
 		Table t = new Table(name);
@@ -195,6 +198,17 @@ public class Table {
 	public Table columns(String... name) {
 		columnNames = new ArrayList<String>();
 		columnNames.addAll(Arrays.asList(name));
+		return this;
+	}
+
+	public Table skip(String... name) {
+		columnNamesToSkip = new ArrayList<>();
+		columnNamesToSkip.addAll(Arrays.asList(name));
+		return this;
+	}
+
+	public Table copy(Row c) {
+		this.copy = c;
 		return this;
 	}
 
@@ -492,7 +506,16 @@ public class Table {
 	}
 
 	private Object valueForColumn(String column) {
-		int index = columnNames.indexOf(column);
+		int index = -1;
+		if (columnNames != null) {
+			index = columnNames.indexOf(column);
+		}
+		if (index == -1) {
+			if (copy != null) {
+				return copy.column(column);
+			}
+			throw new IllegalStateException("No Value supplied for the column=" + column);
+		}
 		return values.get(index);
 	}
 
@@ -501,10 +524,25 @@ public class Table {
 		try {
 			long genId = -1;
 
+			List<String> myColumnNames = null;
+			if (copy == null) {
+				myColumnNames = columnNames;
+			} else {
+				myColumnNames = new ArrayList<>();
+				for (Column c : DB.getMetadata(name).getColumns()) {
+					if (c.autoIncrement)
+						continue;
+					myColumnNames.add(c.name);
+				}
+				if (columnNamesToSkip != null) {
+					myColumnNames.removeAll(columnNamesToSkip);
+				}
+			}
+
 			StringBuilder sb = new StringBuilder();
 			sb.append("INSERT " + (((overwriteColumns != null) || ignore) ? "IGNORE " : "") + "INTO `" + name + "`(");
-			sb.append(safeJoin(columnNames));
-			sb.append(") VALUES (" + StringUtils.join(Collections.nCopies(columnNames.size(), "?"), ',') + ")");
+			sb.append(safeJoin(myColumnNames));
+			sb.append(") VALUES (" + StringUtils.join(Collections.nCopies(myColumnNames.size(), "?"), ',') + ")");
 
 			if (overwriteColumns != null && overwriteColumns.size() > 0) {
 				sb.append(" ON DUPLICATE KEY UPDATE ");
@@ -519,8 +557,8 @@ public class Table {
 			PreparedStatement pstmt = con.prepareStatement(sb.toString(), Statement.RETURN_GENERATED_KEYS);
 
 			int c = 1;
-			for (Object value : values) {
-				pstmt.setObject(c++, value);
+			for (String column : myColumnNames) {
+				pstmt.setObject(c++, valueForColumn(column));
 			}
 			if (overwriteColumns != null && overwriteColumns.size() > 0) {
 				for (String column : overwriteColumns) {
@@ -616,7 +654,7 @@ public class Table {
 			if (t.orderBy.length > 0) {
 				String[] temp = new String[t.orderBy.length];
 				for (int i = 0; i < t.orderBy.length; i++) {
-					temp[i] = "`" + t.name + "`." + t.orderBy[i]; 
+					temp[i] = "`" + t.name + "`." + t.orderBy[i];
 				}
 				sb.append(" ORDER BY " + StringUtils.join(temp, ","));
 				break;
@@ -666,6 +704,8 @@ public class Table {
 				sb.append("COUNT(*)");
 			} else if (average != null) {
 				sb.append("AVG(" + average + ")");
+			} else if (max != null) {
+				sb.append("MAX(" + max + ")");
 			} else {
 				sb.append("*");
 			}
@@ -912,7 +952,23 @@ public class Table {
 		} finally {
 			con.close();
 		}
+	}
 
+	public long max(String column) throws SQLException {
+		max = column;
+		Connection con = DB.getConnection();
+		try {
+			PreparedStatement pstmt = createSelectStatement(con, false);
+			ResultSet results = pstmt.executeQuery();
+			if (results.next())
+				return results.getLong(1);
+			return 0;
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+			throw new IllegalStateException(t);
+		} finally {
+			con.close();
+		}
 	}
 
 	public long count() throws SQLException {
@@ -963,12 +1019,12 @@ public class Table {
 	}
 
 	public Table ascending(String column) {
-		orderBy = (String[])ArrayUtils.add(orderBy, "`" + column + "` ASC");
+		orderBy = (String[]) ArrayUtils.add(orderBy, "`" + column + "` ASC");
 		return this;
 	}
 
 	public Table descending(String column) {
-		orderBy = (String[])ArrayUtils.add(orderBy, "`" + column + "` DESC");
+		orderBy = (String[]) ArrayUtils.add(orderBy, "`" + column + "` DESC");
 		return this;
 	}
 

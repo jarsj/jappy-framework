@@ -6,6 +6,7 @@ import java.io.StringWriter;
 
 import org.json.JSONObject;
 
+import freemarker.core.ParseException;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 
@@ -18,7 +19,7 @@ public class Template {
 	public static Template getInstance() {
 		return INSTANCE;
 	}
-
+	
 	private Template() {
 		try {
 			mConfig = new Configuration();
@@ -27,19 +28,22 @@ public class Template {
 			mConfig.setLocalizedLookup(false);
 			mConfig.setClassicCompatible(false);
 			mConfig.setTagSyntax(Configuration.SQUARE_BRACKET_TAG_SYNTAX);
-			mConfig.setWhitespaceStripping(true);
+			mConfig.setWhitespaceStripping(false);
 			mConfig.setSetting("url_escaping_charset", "UTF-8");
 			mConfig.setDefaultEncoding("UTF-8");
-			mConfig.setTemplateUpdateDelay(3600);
+			mConfig.setTemplateUpdateDelay(10);
+			mConfig.setStrictSyntaxMode(true);
 			mConfig.setObjectWrapper(UWrapper.INSTANCE);
 			mConfig.setNumberFormat("number");
 		} catch (Throwable t) {
 
 		}
 	}
+	
+		
 
 	public void addFolder(File f) {
-
+		mLoader.addFolder(f);
 	}
 
 	public static String expand(String template, JSONObject dict)
@@ -50,8 +54,12 @@ public class Template {
 					.getTemplate(template);
 			t.process(dict, sw, UWrapper.INSTANCE);
 			return sw.toString();
-		} catch (TemplateException t) {
+		} catch (TemplateException | ParseException t) {
 			return "ERROR:" + t.getMessage();
 		}
+	}
+	
+	public void clearCache() {
+		mConfig.clearTemplateCache();
 	}
 }
