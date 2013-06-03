@@ -85,7 +85,7 @@ public class DB {
 							.where("table", table).row();
 					String comment = null;
 					if (commentRow != null) {
-						comment = commentRow.columnAsString("metadata");
+						comment = commentRow.string("metadata");
 					}
 					if (comment != null) {
 						try {

@@ -59,7 +59,7 @@ public class DBTest {
 		Assert.assertEquals(m.getDisplay(), "name");
 
 		Table.get("celebrity").columns("name").values("Harsh").add();
-		long id = Table.get("celebrity").columns("id").row().columnAsLong("id");
+		long id = Table.get("celebrity").columns("id").row().biginteger("id");
 		Table.get("movie").columns("name", "description", "director").values("Love You", "What is good", id)
 				.add();
 
@@ -67,15 +67,15 @@ public class DBTest {
 				.join(Table.get("celebrity").columns("name")).row();
 		
 		try {
-			r.columnAsString("name");
+			r.string("name");
 			Assert.fail("Should throw exception");
 		} catch (IllegalArgumentException e) {
 			
 		}
 		
-		Assert.assertEquals(r.columnAsString("movie", "name"), "Love You");
-		Assert.assertEquals(r.columnAsString("description"), "What is good");
-		Assert.assertEquals(r.columnAsString("celebrity", "name"), "Harsh");
+		Assert.assertEquals(r.string("movie", "name"), "Love You");
+		Assert.assertEquals(r.string("description"), "What is good");
+		Assert.assertEquals(r.string("celebrity", "name"), "Harsh");
 
 		System.out.println(DB.getMetadata("movie"));
 		Table.get("movie").columns(//

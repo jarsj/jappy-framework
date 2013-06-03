@@ -819,7 +819,7 @@ public class Table {
 		List<Row> rows = rows();
 		String[] ret = new String[rows.size()];
 		for (int i = 0; i < rows.size(); i++) {
-			ret[i] = rows.get(i).columnAsString(columnNames.get(0));
+			ret[i] = rows.get(i).string(columnNames.get(0));
 		}
 		return ret;
 	}

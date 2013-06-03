@@ -45,8 +45,8 @@ public class Row implements IJSONConvertible {
 	public String display() {
 		Metadata m = DB.getMetadata(tables.first());
 		if (m.getDisplay() == null)
-			return columnAsString(m.columns.get(0).getName());
-		return columnAsString(m.getDisplay());
+			return string(m.columns.get(0).getName());
+		return string(m.getDisplay());
 	}
 
 	private String getTable(String name) {
@@ -66,17 +66,17 @@ public class Row implements IJSONConvertible {
 		return columns.get(table + "." + name);
 	}
 
-	public String columnAsString(String name) {
+	public String string(String name) {
 		if (name == null)
 			throw new IllegalArgumentException(
-					"Passed null argument to columnAsString argument=name");
-		return columnAsString(getTable(name), name);
+					"Passed null argument to string argument=name");
+		return string(getTable(name), name);
 	}
 
-	public String columnAsString(String table, String name) {
+	public String string(String table, String name) {
 		if (table == null)
 			throw new IllegalArgumentException(
-					"Passed null argument to columnAsString argument=table");
+					"Passed null argument to string argument=table");
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object o = column(table, name);
 		if (o instanceof String)
@@ -84,11 +84,11 @@ public class Row implements IJSONConvertible {
 		return (o != null) ? o.toString() : c.def;
 	}
 
-	public String columnAsUrl(String name) {
-		return columnAsUrl(getTable(name), name);
+	public String url(String name) {
+		return url(getTable(name), name);
 	}
 
-	public String columnAsUrl(String table, String name) {
+	public String url(String table, String name) {
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object value = column(name);
 		if (value == null)
@@ -102,8 +102,8 @@ public class Row implements IJSONConvertible {
 		return null;
 	}
 
-	public JSONObject columnAsJSONObject(String name) throws JSONException {
-		return new JSONObject(columnAsString(name));
+	public JSONObject jsonObject(String name) throws JSONException {
+		return new JSONObject(string(name));
 	}
 
 	public String moneyAsString(String name, String currency) {
@@ -111,7 +111,7 @@ public class Row implements IJSONConvertible {
 	}
 
 	public String moneyAsString(String table, String name, String currency) {
-		long money = columnAsLong(table, name);
+		long money = biginteger(table, name);
 		if (currency.equals("USD")) {
 			if (money == 0)
 				return "";
@@ -146,7 +146,7 @@ public class Row implements IJSONConvertible {
 		return o.toString();
 	}
 
-	public long columnAsLong(String table, String name) {
+	public long biginteger(String table, String name) {
 		Object o = column(table, name);
 		if (o == null)
 			return 0;
@@ -155,11 +155,11 @@ public class Row implements IJSONConvertible {
 		return Long.parseLong(o.toString());
 	}
 
-	public int columnAsInt(String name, int def) {
-		return columnAsInt(getTable(name), name, def);
+	public int integer(String name, int def) {
+		return integer(getTable(name), name, def);
 	}
 
-	public boolean columnAsBool(String table, String name) {
+	public boolean bool(String table, String name) {
 		Object o = column(table, name);
 		if (o instanceof Boolean)
 			return (Boolean) o;
@@ -169,11 +169,11 @@ public class Row implements IJSONConvertible {
 		return o != null;
 	}
 
-	public boolean columnAsBool(String name) {
-		return columnAsBool(getTable(name), name);
+	public boolean bool(String name) {
+		return bool(getTable(name), name);
 	}
 
-	public int columnAsInt(String table, String name, int def) {
+	public int integer(String table, String name, int def) {
 		Object o = column(table, name);
 		if (o == null)
 			return def;
@@ -182,13 +182,13 @@ public class Row implements IJSONConvertible {
 		return Integer.parseInt(o.toString());
 	}
 
-	public Date columnAsDate(String table, String name) {
+	public Date date(String table, String name) {
 		java.sql.Date sqlDate = (java.sql.Date) column(table, name);
 		return new Date(sqlDate.getTime());
 	}
 
-	public Date columnAsDate(String name) {
-		return columnAsDate(getTable(name), name);
+	public Date date(String name) {
+		return date(getTable(name), name);
 	}
 
 	@Override
@@ -214,12 +214,12 @@ public class Row implements IJSONConvertible {
 		return ret;
 	}
 
-	public int columnAsInt(String name) {
-		return columnAsInt(getTable(name), name, 0);
+	public int integer(String name) {
+		return integer(getTable(name), name, 0);
 	}
 
-	public long columnAsLong(String name) {
-		return columnAsLong(getTable(name), name);
+	public long biginteger(String name) {
+		return biginteger(getTable(name), name);
 	}
 
 	public String dateAsString(String name, String format) {
