@@ -66,7 +66,7 @@ public class DBAdmin extends HttpServlet {
 								WhereOp.LIKE).limit(10).rows();
 				for (Row r : rows) {
 					String display = r.display();
-					ret.put(new JSONObject().put("id", r.columnAsString(c))
+					ret.put(new JSONObject().put("id", r.string(c))
 							.put("label", display).put("value", display));
 				}
 				resp.getWriter().write(ret.toString());
@@ -150,12 +150,12 @@ public class DBAdmin extends HttpServlet {
 							case TEXT:
 							case LONGTEXT:
 								rowJSON.put(col.getName(), StringEscapeUtils
-										.escapeHtml(row.columnAsString(col
+										.escapeHtml(row.string(col
 												.getName())));
 								break;
 							case INTEGER:
 								rowJSON.put(col.getName(),
-										row.columnAsString(col.getName()));
+										row.string(col.getName()));
 								break;
 							case DATETIME:
 								rowJSON.put(col.getName(), row.dateAsString(
@@ -167,7 +167,7 @@ public class DBAdmin extends HttpServlet {
 								break;
 							case REFERENCE:
 								rowJSON.put(col.getName(),
-										row.columnAsString(col.getName()));
+										row.string(col.getName()));
 								Constraint cons = m
 										.getConstraint(col.getName());
 								Metadata dstMeta = DB.getMetadata(cons
@@ -259,7 +259,7 @@ public class DBAdmin extends HttpServlet {
 						rowJSON.put(toShow.display());
 					}
 				} else {
-					rowJSON.put(Utils.trim(r.columnAsString(column), 30));
+					rowJSON.put(Utils.trim(r.string(column), 30));
 				}
 
 			}
@@ -267,11 +267,11 @@ public class DBAdmin extends HttpServlet {
 			action.append(String
 					.format("<a href='../dbadmin/%s/edit?c=%s&v=%s'><i class='icon-pencil'></i></a>",
 							table, m.getPrimary().getColumn(0),
-							r.columnAsString(m.getPrimary().getColumn(0))));
+							r.string(m.getPrimary().getColumn(0))));
 			action.append(String
 					.format("<a href='../dbadmin/%s/delete?c=%s&v=%s'><i class='icon-trash'></i></a>",
 							table, m.getPrimary().getColumn(0),
-							r.columnAsString(m.getPrimary().getColumn(0))));
+							r.string(m.getPrimary().getColumn(0))));
 			rowJSON.put(action.toString());
 			data.put(rowJSON);
 		}

@@ -222,12 +222,12 @@ public class Crawler extends HttpServlet {
 							.ascending("priority").row();
 					if (r == null)
 						return;
-					Table.get("crawl_queue").where("id", r.columnAsLong("id"))
+					Table.get("crawl_queue").where("id", r.biginteger("id"))
 							.delete();
 				}
 				Job j = new Job((String) r.column("url"),
-						r.columnAsInt("priority"), null);
-				JSONObject o = new JSONObject(r.columnAsString("metadata"));
+						r.integer("priority"), null);
+				JSONObject o = new JSONObject(r.string("metadata"));
 				j.setMetadata(o);
 
 				while (j != null) {
@@ -272,7 +272,7 @@ public class Crawler extends HttpServlet {
 						cstats.errors.incrementAndGet();
 					}
 
-					Table.get("crawl_queue").where("id", r.columnAsLong("id"))
+					Table.get("crawl_queue").where("id", r.biginteger("id"))
 							.delete();
 
 					// If we got a cache hit let's try crawling one more time.
@@ -281,9 +281,9 @@ public class Crawler extends HttpServlet {
 								.ascending("priority").row();
 						if (r != null) {
 							j = new Job((String) r.column("url"),
-									r.columnAsInt("priority"), null);
+									r.integer("priority"), null);
 							j.setMetadata(new JSONObject(r
-									.columnAsString("metadata")));
+									.string("metadata")));
 						} else {
 							break;
 						}
