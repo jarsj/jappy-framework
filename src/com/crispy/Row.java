@@ -1,16 +1,15 @@
 package com.crispy;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 
@@ -68,15 +67,13 @@ public class Row implements IJSONConvertible {
 
 	public String columnAsString(String name) {
 		if (name == null)
-			throw new IllegalArgumentException(
-					"Passed null argument to columnAsString argument=name");
+			throw new IllegalArgumentException("Passed null argument to columnAsString argument=name");
 		return columnAsString(getTable(name), name);
 	}
 
 	public String columnAsString(String table, String name) {
 		if (table == null)
-			throw new IllegalArgumentException(
-					"Passed null argument to columnAsString argument=table");
+			throw new IllegalArgumentException("Passed null argument to columnAsString argument=table");
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object o = column(table, name);
 		if (o instanceof String)
@@ -84,20 +81,20 @@ public class Row implements IJSONConvertible {
 		return (o != null) ? o.toString() : c.def;
 	}
 
-	public String columnAsUrl(String name) {
+	public URL columnAsUrl(String name) throws MalformedURLException {
 		return columnAsUrl(getTable(name), name);
 	}
 
-	public String columnAsUrl(String table, String name) {
+	public URL columnAsUrl(String table, String name) throws MalformedURLException {
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object value = column(name);
 		if (value == null)
 			return null;
 		switch (c.simpleType(DB.getMetadata(table))) {
 		case FILE:
-			return "/resource/local" + value.toString();
+			return new URL("file://" + value.toString());
 		case S3:
-			return value.toString();
+			return new URL(value.toString());
 		}
 		return null;
 	}

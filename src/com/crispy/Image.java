@@ -1,5 +1,6 @@
 package com.crispy;
 
+
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
@@ -11,7 +12,6 @@ import java.net.URL;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.imageio.ImageIO;
-import javax.media.jai.JAI;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -22,6 +22,8 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.imgscalr.Scalr;
+import org.imgscalr.Scalr.Method;
+import org.imgscalr.Scalr.Mode;
 import org.json.JSONObject;
 
 @WebServlet(urlPatterns = { "/resource", "/resource/*" })
@@ -134,8 +136,7 @@ public class Image extends HttpServlet {
 
 	public static File scale(File source, int width, int height)
 			throws IOException {
-		BufferedImage image = JAI.create("fileload", source.getAbsolutePath())
-				.getAsBufferedImage();
+		BufferedImage image = ImageIO.read(source);
 		String extension = source.getName().substring(
 				source.getName().lastIndexOf(".") + 1);
 		return internalScale(image, extension, width, height);
@@ -149,9 +150,8 @@ public class Image extends HttpServlet {
 		return new int[]{image.getWidth(), image.getHeight()};
 	}
 
-	public static File scale(File source, int size) throws IOException {
-		BufferedImage image = JAI.create("fileload", source.getAbsolutePath())
-				.getAsBufferedImage();
+	private static File scale(File source, int size) throws IOException {
+		BufferedImage image = ImageIO.read(source);
 		String extension = source.getName().substring(
 				source.getName().lastIndexOf(".") + 1);
 		return internalScale(image, extension, size);
@@ -172,7 +172,7 @@ public class Image extends HttpServlet {
 
 	private static File internalScale(BufferedImage image, String extension,
 			int width, int height) throws IOException {
-		BufferedImage scaled = Scalr.resize(image, width, height);
+		BufferedImage scaled = Scalr.resize(image, Method.ULTRA_QUALITY, Mode.FIT_EXACT, width, height);
 		File tempFile = File.createTempFile("tempScaled_", "." + extension);
 		ImageIO.write(scaled, extension, tempFile);
 		return tempFile;
@@ -180,12 +180,9 @@ public class Image extends HttpServlet {
 
 	private static File internalScale(BufferedImage image, String extension,
 			int size) throws IOException {
-		BufferedImage scaled = Scalr.resize(image, size);
+		BufferedImage scaled = Scalr.resize(image, Method.ULTRA_QUALITY, size);
 		File tempFile = File.createTempFile("tempScaled_", "." + extension);
 		ImageIO.write(scaled, extension, tempFile);
 		return tempFile;
 	}
-	
-	
-
 }

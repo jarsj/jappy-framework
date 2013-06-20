@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,6 +17,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 
+import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
@@ -32,6 +35,9 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 public class Cloud {
 	private static final Log LOG = Log.get("cloud");
 
+	public static boolean localMode = false;
+	public static boolean connected;
+	
 	private static AWSCredentials credentials;
 	private static ConcurrentHashMap<String, Boolean> mBuckets;
 	private Set<String> keys;
@@ -39,6 +45,7 @@ public class Cloud {
 
 	public static void init(String accessKey, String secretKey) {
 		credentials = new BasicAWSCredentials(accessKey, secretKey);
+		connected = false;
 		reloadBuckets();
 	}
 
@@ -48,13 +55,18 @@ public class Cloud {
 
 	private static void reloadBuckets() {
 		mBuckets = new ConcurrentHashMap<String, Boolean>();
-		AmazonS3Client client = new AmazonS3Client(credentials);
-		for (Bucket b : client.listBuckets()) {
-			mBuckets.put(b.getName(), true);
+		try {
+			AmazonS3Client client = new AmazonS3Client(credentials);
+			for (Bucket b : client.listBuckets()) {
+				mBuckets.put(b.getName(), true);
+			}
+			connected = true;
+		} catch (AmazonClientException t) {
+			LOG.error("Unable to connect with amazon");
 		}
 		LOG.info("Initialize S3 with " + mBuckets.size() + " buckets");
 	}
-	
+
 	private AmazonS3 s3;
 	private String bucket;
 	private AccessControlList acl;
@@ -68,7 +80,7 @@ public class Cloud {
 		c.bucket = bucket;
 		return c;
 	}
-	
+
 	public Cloud create() {
 		if (!mBuckets.containsKey(bucket)) {
 			s3.createBucket(bucket);
@@ -92,7 +104,7 @@ public class Cloud {
 		acl.grantPermission(GroupGrantee.AllUsers, Permission.Read);
 		return this;
 	}
-	
+
 	public Cloud neverExpire() {
 		neverExpire = true;
 		return this;
@@ -100,8 +112,7 @@ public class Cloud {
 
 	public Cloud cacheKeys() {
 		keys = new TreeSet<String>();
-		ObjectListing listing = s3.listObjects(new ListObjectsRequest()
-				.withBucketName(bucket).withMaxKeys(Integer.MAX_VALUE));
+		ObjectListing listing = s3.listObjects(new ListObjectsRequest().withBucketName(bucket).withMaxKeys(Integer.MAX_VALUE));
 		for (S3ObjectSummary summary : listing.getObjectSummaries()) {
 			keys.add(summary.getKey());
 		}
@@ -130,9 +141,8 @@ public class Cloud {
 		if (neverExpire) {
 			metadata.setCacheControl("max-age=8640000");
 		}
-		
-		PutObjectRequest request = new PutObjectRequest(bucket, key,
-				new FileInputStream(value), metadata);
+
+		PutObjectRequest request = new PutObjectRequest(bucket, key, new FileInputStream(value), metadata);
 		if (acl != null) {
 			request = request.withAccessControlList(acl);
 		}
@@ -140,8 +150,7 @@ public class Cloud {
 		return this;
 	}
 
-	public Cloud upload(String key, String url) throws ClientProtocolException,
-			IOException {
+	public Cloud upload(String key, String url) throws ClientProtocolException, IOException {
 		DefaultHttpClient client = new DefaultHttpClient();
 		HttpGet get = new HttpGet(url);
 		HttpResponse response = client.execute(get);
@@ -156,8 +165,7 @@ public class Cloud {
 			if (neverExpire) {
 				metadata.setCacheControl("max-age=8640000");
 			}
-			PutObjectRequest request = new PutObjectRequest(bucket, key,
-					entity.getContent(), metadata);
+			PutObjectRequest request = new PutObjectRequest(bucket, key, entity.getContent(), metadata);
 			if (acl != null) {
 				request = request.withAccessControlList(acl);
 			}
@@ -167,5 +175,25 @@ public class Cloud {
 			EntityUtils.consume(response.getEntity());
 		}
 		return this;
+	}
+	
+	public static void cacheS3(int N) throws IOException {
+		int done = 0;
+		for (Metadata m : DB.getTables()) {
+			for (Column c : m.columns) {
+				if (c.comment.startsWith("s3:")) {
+					for (Row r : Table.get(m.name).columns(c.name).rows()) {
+						String url = r.columnAsUrl(c.name).toString();
+						URL u = new URL(url);
+						if (!Cache.getInstance().existsInCache(u)) {
+							Cache.getInstance().fetchUrl(u);
+							done++;
+							if (done >= N) 
+								return;
+						}
+					}
+				}
+			}
+		}
 	}
 }
