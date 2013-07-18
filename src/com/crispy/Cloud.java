@@ -37,7 +37,7 @@ public class Cloud {
 
 	public static boolean localMode = false;
 	public static boolean connected;
-	
+
 	private static AWSCredentials credentials;
 	private static ConcurrentHashMap<String, Boolean> mBuckets;
 	private Set<String> keys;
@@ -176,19 +176,20 @@ public class Cloud {
 		}
 		return this;
 	}
-	
+
 	public static void cacheS3(int N) throws IOException {
 		int done = 0;
 		for (Metadata m : DB.getTables()) {
 			for (Column c : m.columns) {
 				if (c.comment.startsWith("s3:")) {
 					for (Row r : Table.get(m.name).columns(c.name).rows()) {
-						String url = r.columnAsUrl(c.name).toString();
-						URL u = new URL(url);
+						URL u = r.columnAsUrl(c.name);
+						if (u == null)
+							continue;
 						if (!Cache.getInstance().existsInCache(u)) {
 							Cache.getInstance().fetchUrl(u);
 							done++;
-							if (done >= N) 
+							if (done >= N)
 								return;
 						}
 					}

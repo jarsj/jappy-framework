@@ -705,7 +705,7 @@ public class Table {
 			} else if (average != null) {
 				sb.append("AVG(" + average + ")");
 			} else if (max != null) {
-				sb.append("MAX(" + max + ")");
+				sb.append("MAX(`" + max + "`)");
 			} else {
 				sb.append("*");
 			}

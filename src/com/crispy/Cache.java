@@ -96,6 +96,18 @@ public class Cache extends HttpServlet {
 		return f.exists();
 	}
 
+	public static String wrap(URL u) throws IOException {
+		if (u == null)
+			return "null";
+		if (Cloud.localMode) {
+			if (Cloud.connected) {
+				Cache.getInstance().fetchUrl(u);
+			}
+			return "/cache/" + u.getHost() + (u.getPath().startsWith("/") ? "" : "/") + u.getPath();
+		}
+		return u.toString();
+	}
+	
 	public static String wrap(URL u, int width, int height) throws IOException {
 		if (u == null)
 			return "null";
@@ -117,6 +129,12 @@ public class Cache extends HttpServlet {
 		LOG.info("cache-miss u=" + u.toString());
 		FileUtils.copyURLToFile(u, f);
 		return f;
+	}
+	
+	public void storeUrl(URL u, File content) throws IOException {
+		File f = new File(cacheFolder, u.getHost() + "/" + u.getPath());
+		f.getParentFile().mkdirs();
+		FileUtils.copyFile(content, f);
 	}
 
 	public File fetchUrl(URL u, int width, int height) throws IOException {

@@ -2,9 +2,6 @@ package com.crispy;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.net.URL;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -15,11 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collection;
 
-import javax.mail.Folder;
-
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
-import org.json.JSONObject;
 
 import com.google.common.base.Objects;
 
@@ -70,6 +63,10 @@ public class Column {
 
 	public static Column mediumtext(String name) {
 		return new Column(name, "MEDIUMTEXT");
+	}
+	
+	public static Column floating(String name) {
+		return new Column(name, "FLOAT");
 	}
 
 	public static Column longtext(String name) {
@@ -194,6 +191,7 @@ public class Column {
 						try {
 							return Image.uploadS3(s3Bucket, new FileInputStream((File) value), ((File) value).getName());
 						} catch (Exception e) {
+							e.printStackTrace();
 							return null;
 						}
 					} else if (value instanceof URL) {
@@ -276,6 +274,11 @@ public class Column {
 			if (value.toString().trim().length() == 0)
 				return null;
 			return Integer.parseInt(value.toString().trim());
+		}
+		if (type.equals("FLOAT")) {
+			if (value.toString().trim().length() == 0)
+				return null;
+			return Float.parseFloat(value.toString().trim());
 		}
 		if (type.equals("BOOL")) {
 			if (value.toString().trim().length() == 0)

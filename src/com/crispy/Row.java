@@ -21,6 +21,7 @@ public class Row implements IJSONConvertible {
 	private HashMap<String, Object> columns;
 	private HashMap<String, LinkedList<String>> columnToTableIndex;
 	private TreeSet<String> tables;
+	private static final Log LOG = Log.get("db");
 
 	protected Row(ResultSet results) throws SQLException {
 		columns = new HashMap<String, Object>();
@@ -82,19 +83,32 @@ public class Row implements IJSONConvertible {
 	}
 
 	public URL columnAsUrl(String name) throws MalformedURLException {
+		// Hello World
 		return columnAsUrl(getTable(name), name);
 	}
 
-	public URL columnAsUrl(String table, String name) throws MalformedURLException {
+	public URL columnAsUrl(String table, String name) {
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object value = column(name);
 		if (value == null)
 			return null;
 		switch (c.simpleType(DB.getMetadata(table))) {
-		case FILE:
-			return new URL("file://" + value.toString());
-		case S3:
-			return new URL(value.toString());
+		case FILE: {
+			try {
+				return new URL("file://" + value.toString());
+			} catch (MalformedURLException e) {
+				LOG.error("Malformed url table=" + table + " column=" + name);
+				return null;
+			}
+		}
+		case S3: {
+			try {
+				return new URL(value.toString());
+			} catch (MalformedURLException e) {
+				LOG.error("Malformed url table=" + table + " column=" + name);
+				return null;
+			}
+		}
 		}
 		return null;
 	}
@@ -154,6 +168,19 @@ public class Row implements IJSONConvertible {
 
 	public int columnAsInt(String name, int def) {
 		return columnAsInt(getTable(name), name, def);
+	}
+	
+	public float columnAsFloat(String name, float def) {
+		return columnAsFloat(getTable(name), name, def);
+	}
+
+	public float columnAsFloat(String table, String name, float def) {
+		Object o = column(table, name);
+		if (o == null)
+			return def;
+		if (o instanceof Number)
+			return ((Number) o).floatValue();
+		return Float.parseFloat(o.toString());
 	}
 
 	public boolean columnAsBool(String table, String name) {

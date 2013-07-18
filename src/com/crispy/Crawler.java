@@ -34,9 +34,7 @@ import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
 
 /**
- * 
  * @author harsh
- * 
  */
 @WebServlet("/crawler/*")
 public class Crawler extends HttpServlet {
