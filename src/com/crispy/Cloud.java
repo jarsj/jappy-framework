@@ -18,6 +18,7 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 
 import com.amazonaws.AmazonClientException;
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
@@ -142,7 +143,8 @@ public class Cloud {
 			metadata.setCacheControl("max-age=8640000");
 		}
 
-		PutObjectRequest request = new PutObjectRequest(bucket, key, new FileInputStream(value), metadata);
+		PutObjectRequest request = new PutObjectRequest(bucket, key, value);
+		request.setMetadata(metadata);
 		if (acl != null) {
 			request = request.withAccessControlList(acl);
 		}
@@ -185,6 +187,8 @@ public class Cloud {
 					for (Row r : Table.get(m.name).columns(c.name).rows()) {
 						URL u = r.columnAsUrl(c.name);
 						if (u == null)
+							continue;
+						if (u.toString().endsWith(".psd"))
 							continue;
 						if (!Cache.getInstance().existsInCache(u)) {
 							Cache.getInstance().fetchUrl(u);

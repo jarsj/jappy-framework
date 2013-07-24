@@ -27,6 +27,7 @@ public class Log {
 	private static Level DEFAULT_DAILY_LEVEL;
 	private static String DEFAULT_SIZE_FOLDER;
 	private static Level DEFAULT_SIZE_LEVEL;
+	private static Level DEFAULT_CONSOLE_LEVEL;
 
 	private String name;
 	private Logger logger;
@@ -37,7 +38,7 @@ public class Log {
 		this.prefix = "";
 		this.logger = Logger.getLogger(name);
 		if (DEFAULT_CONSOLE) {
-			console();
+			console(DEFAULT_CONSOLE_LEVEL);
 		}
 		if (DEFAULT_DAILY_FOLDER != null) {
 			daily(DEFAULT_DAILY_FOLDER, DEFAULT_DAILY_LEVEL);
@@ -77,8 +78,9 @@ public class Log {
 		}
 	}
 
-	public static void globalConsole() {
+	public static void globalConsole(Level l) {
 		DEFAULT_CONSOLE = true;
+		DEFAULT_CONSOLE_LEVEL = l;
 	}
 
 	public static void globalEmail(String to, Level l) {
@@ -127,12 +129,13 @@ public class Log {
 		return this;
 	}
 
-	public Log console() {
+	public Log console(Level l) {
 		logger.removeAppender("jappy-console");
 		ConsoleAppender console = new ConsoleAppender();
 		console.setName("jappy-console");
 		console.setLayout(new PatternLayout(
-				"%d{yyyy-MM-dd HH:mm:ss} %m%n"));
+				"%p %d{yyyy-MM-dd HH:mm:ss} %m%n"));
+		console.setThreshold(l);
 		console.activateOptions();
 		logger.addAppender(console);
 		return this;
@@ -142,8 +145,8 @@ public class Log {
 		logger.removeAppender("jappy-email");
 		EC2SMTPAppender email = new EC2SMTPAppender(to, l);
 		email.setName("jappy-email");
-		email.activateOptions();
 		email.setThreshold(l);
+		email.activateOptions();
 		logger.addAppender(email);
 		return this;
 	}
