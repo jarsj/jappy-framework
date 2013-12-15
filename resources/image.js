@@ -1,4 +1,4 @@
-function JappyConvertFileInput(input) {
+function JappyConvertFileInput(input, hiddenInput) {
 	if (input.attr("data-folder") || input.attr("data-bucket")) {
 		var fileUploaderElem = $("<div id='file-uploader'/>");
 
@@ -27,8 +27,11 @@ function JappyConvertFileInput(input) {
 			element : fileUploaderElem[0],
 			action : "/resource",
 			onComplete : function(id, fileName, responseJSON) {
-				var hiddenInput = $("<input type='hidden'/>");
-				hiddenInput.attr("name", this.myname);
+				if (!hiddenInput) {
+					hiddenInput = $("<input type='hidden'/>");
+					hiddenInput.attr("name", this.myname);
+				}
+				
 				if (json) {
 					var o = {
 						name : fileName,

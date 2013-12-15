@@ -198,6 +198,7 @@ public class Column {
 						try {
 							return Image.uploadS3(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath());
 						} catch (Exception e) {
+							e.printStackTrace();
 							return null;
 						}
 					} else {

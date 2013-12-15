@@ -219,7 +219,7 @@ public class Row implements IJSONConvertible {
 	public JSONObject toJSONObject() {
 		return new JSONObject(columns);
 	}
-
+	
 	public static JSONObject rowToJSON(Row r) throws JSONException {
 		JSONObject o = new JSONObject();
 		for (Map.Entry<String, Object> entry : r.columns.entrySet()) {
@@ -248,5 +248,16 @@ public class Row implements IJSONConvertible {
 
 	public String dateAsString(String name, String format) {
 		return dateAsString(getTable(name), name, format);
+	}
+	
+	public void update(String column, Object value) {
+		String table = getTable(column);
+		Metadata meta = DB.getMetadata(table);
+		Index primary = meta.getPrimary();
+		Table t = Table.get(table);
+		for (String col : primary.columns) {
+			t.where(col, column(col));
+		}
+		t.columns(column).values(value).update();
 	}
 }

@@ -473,7 +473,7 @@ public class Table {
 			sb.append(StringUtils.join(updates, ','));
 
 			whereStatement(sb);
-			LOG.info("update=" + sb.toString());
+			LOG.debug("update=" + sb.toString());
 			PreparedStatement pstmt = con.prepareStatement(sb.toString());
 			int c = 1;
 

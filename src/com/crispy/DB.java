@@ -28,7 +28,7 @@ public class DB {
 	private static DB INSTANCE = new DB();
 	private static Log LOG = Log.get("db");
 
-	public static void init(String database, String user, String password) {
+	public static void init(String host, String database, String user, String password) {
 		if (INSTANCE.mDS != null) {
 			try {
 				INSTANCE.mDS.close();
@@ -39,7 +39,7 @@ public class DB {
 		INSTANCE.database = database;
 		BasicDataSource bds = new BasicDataSource();
 		bds.setDriverClassName("com.mysql.jdbc.Driver");
-		bds.setUrl("jdbc:mysql://localhost/" + database + "?zeroDateTimeBehavior=convertToNull");
+		bds.setUrl("jdbc:mysql://" + host + "/" + database + "?zeroDateTimeBehavior=convertToNull");
 		bds.setUsername(user);
 		bds.setPassword(password);
 		bds.setTestOnBorrow(true);
@@ -50,6 +50,10 @@ public class DB {
 				.columns(Column.text("table", 100),
 						Column.mediumtext("metadata")).primary("table")
 				.create();
+	}
+	
+	public static void init(String database, String user, String password) {
+		init("localhost", database, user, password);
 	}
 
 	public static void shutdown() {
@@ -214,6 +218,7 @@ public class DB {
 
 	public static void updateQuery(String sql, Object... args)
 			throws SQLException {
+		System.out.println(sql);
 		Connection con = getConnection();
 		try {
 			updateQuery(con, sql, args);

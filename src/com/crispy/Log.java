@@ -3,7 +3,6 @@ package com.crispy;
 import java.io.File;
 import java.net.URLEncoder;
 
-import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.DailyRollingFileAppender;

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 import org.htmlcleaner.ContentNode;
 import org.htmlcleaner.HtmlNode;
@@ -71,8 +72,7 @@ public class ExtractionUtils {
 		return children.get(myIndex);
 	}
 
-	public static TagNode[] evaluateXPath(TagNode node, String xpath)
-			throws Exception {
+	public static TagNode[] evaluateXPath(TagNode node, String xpath) throws Exception {
 		Object[] nodes = node.evaluateXPath(xpath);
 		if (nodes == null)
 			return new TagNode[0];
@@ -114,9 +114,7 @@ public class ExtractionUtils {
 				multiplier *= 1000000L;
 		}
 		try {
-			return (long) DecimalFormat.getNumberInstance().parse(s)
-					.floatValue()
-					* multiplier;
+			return (long) DecimalFormat.getNumberInstance().parse(s).floatValue() * multiplier;
 		} catch (Exception e) {
 			return -1;
 		}
@@ -157,21 +155,22 @@ public class ExtractionUtils {
 		List children = td.getChildren();
 		for (Object c : children) {
 			if (c instanceof ContentNode) {
-				String content = ((ContentNode) c).getContent().toString()
-						.trim();
-				if (content.length() > 0)
-					ret.put(new JSONObject().put("name", content));
+				String content = ((ContentNode) c).getContent().toString().trim();
+				if (content.length() > 0) {
+					for (String cast : StringUtils.split(content, ",/")) {
+						if (cast.trim().length() > 0) {
+							ret.put(new JSONObject().put("name", cast.trim()));
+						}
+					}
+				}
 			} else if (c instanceof TagNode) {
 				TagNode tc = (TagNode) c;
 				if (tc.getName().equals("br"))
 					continue;
 				if (tc.getName().equals("a")) {
-					ret.put(new JSONObject().put("name",
-							tc.getText().toString().trim()).put("link",
-							ExtractionUtils.fullWikiLink(tc)));
+					ret.put(new JSONObject().put("name", tc.getText().toString().trim()).put("link", ExtractionUtils.fullWikiLink(tc)));
 				}
 			}
-
 		}
 		return ret;
 	}
@@ -181,6 +180,7 @@ public class ExtractionUtils {
 		if (o instanceof ContentNode) {
 			String content = ((ContentNode) o).getContent().toString();
 			content = content.trim().toLowerCase();
+			content = StringEscapeUtils.unescapeHtml(content);
 			if (content.length() > 0) {
 				ret.add(content);
 			}
@@ -202,14 +202,11 @@ public class ExtractionUtils {
 	}
 
 	public static void cleanWikipedia(TagNode h2) throws Exception {
-		clean(h2, "//span[@class=\"editsection\"]", "//sup",
-				"//span[@style=\"display:none\"]");
+		clean(h2, "//span[@class=\"editsection\"]", "//span[@class=\"mw-editsection\"]", "//sup", "//span[@style=\"display:none\"]");
 	}
 
-	public static TagNode wikipediaHeadingNode(TagNode document,
-			String... keyword) throws Exception {
-		TagNode[] headings = evaluateXPath(document,
-				"//div[@id=\"mw-content-text\"]/h2");
+	public static TagNode wikipediaHeadingNode(TagNode document, String... keyword) throws Exception {
+		TagNode[] headings = evaluateXPath(document, "//div[@id=\"mw-content-text\"]/h2");
 		for (TagNode heading : headings) {
 			cleanWikipedia(heading);
 			String ch = heading.getText().toString().trim().toLowerCase();
@@ -240,8 +237,7 @@ public class ExtractionUtils {
 		return null;
 	}
 
-	public static Object special(TagNode document, String expr)
-			throws Exception {
+	public static Object special(TagNode document, String expr) throws Exception {
 		if (expr.startsWith("next")) {
 			String command = expr.substring(0, expr.indexOf('('));
 			String sibling = command.substring(command.indexOf('-') + 1);
@@ -249,8 +245,7 @@ public class ExtractionUtils {
 			String nextExpr = expr.substring(0, expr.lastIndexOf(')'));
 			expr = expr.substring(expr.lastIndexOf(')') + 1);
 
-			TagNode nextNode = (TagNode) ExtractionUtils.first(document,
-					nextExpr);
+			TagNode nextNode = (TagNode) ExtractionUtils.first(document, nextExpr);
 			Object nextNextNode = ExtractionUtils.sibling(nextNode, 1, sibling);
 			if (expr.length() > 0)
 				return ExtractionUtils.first((TagNode) nextNextNode, expr);
@@ -264,6 +259,16 @@ public class ExtractionUtils {
 			return ((TagNode) node).getText().toString();
 		else if (node instanceof ContentNode)
 			return ((ContentNode) node).getContent().toString();
-		return node.toString();
+		return StringEscapeUtils.unescapeHtml(node.toString());
+	}
+
+	public static String removeBrackets(String content) {
+		int open = content.indexOf('(');
+		if (open == -1)
+			return content;
+		int close = content.indexOf(')', open);
+		if (close == -1)
+			return content;
+		return content.substring(0, open).trim();
 	}
 }

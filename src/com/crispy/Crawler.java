@@ -1,6 +1,7 @@
 package com.crispy;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -59,27 +60,28 @@ public class Crawler extends HttpServlet {
 	}
 
 	public void start(int connections, int timeout_in_seconds, int delay_in_milliseconds) {
-		Table.get("crawl_queue").columns(Column.bigInteger("id", true),//
+		Table.get("crawl_queue_normal").columns(Column.bigInteger("id", true),//
 				Column.text("url", 512),//
-				Column.integer("priority"),//
-				Column.longtext("metadata")).indexes(Index.create("priority"))
-				.create();
-		
+				Column.longtext("metadata")).create();
+
+		Table.get("crawl_queue_high").columns(Column.bigInteger("id", true),//
+				Column.text("url", 512),//
+				Column.longtext("metadata")).create();
+
 		HttpParams params = new BasicHttpParams();
 		HttpConnectionParams.setConnectionTimeout(params, timeout_in_seconds * 1000);
 		HttpConnectionParams.setSoTimeout(params, timeout_in_seconds * 1000);
-		
+
 		ThreadSafeClientConnManager cm = new ThreadSafeClientConnManager();
 		cm.setMaxTotal(connections);
 		cm.setDefaultMaxPerRoute(2);
 
 		httpClient = (DefaultHttpClient) wrapClient(new DefaultHttpClient(cm, params));
-		
+
 		background = Executors.newScheduledThreadPool(connections);
 		stats = new ConcurrentHashMap<String, CrawlStats>();
 		for (int i = 0; i < connections; i++) {
-			background.scheduleWithFixedDelay(new CrawlJob(), 0, delay_in_milliseconds,
-					TimeUnit.MILLISECONDS);
+			background.scheduleWithFixedDelay(new CrawlJob(), 0, delay_in_milliseconds, TimeUnit.MILLISECONDS);
 		}
 	}
 
@@ -95,26 +97,21 @@ public class Crawler extends HttpServlet {
 				}
 
 				@Override
-				public void checkServerTrusted(
-						java.security.cert.X509Certificate[] chain,
-						String authType)
+				public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType)
 						throws java.security.cert.CertificateException {
 					// TODO Auto-generated method stub
 
 				}
 
 				@Override
-				public void checkClientTrusted(
-						java.security.cert.X509Certificate[] chain,
-						String authType)
+				public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType)
 						throws java.security.cert.CertificateException {
 					// TODO Auto-generated method stub
 
 				}
 			};
 			ctx.init(null, new TrustManager[] { tm }, null);
-			org.apache.http.conn.ssl.SSLSocketFactory ssf = new org.apache.http.conn.ssl.SSLSocketFactory(
-					ctx);
+			org.apache.http.conn.ssl.SSLSocketFactory ssf = new org.apache.http.conn.ssl.SSLSocketFactory(ctx);
 			ssf.setHostnameVerifier(org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
 			ClientConnectionManager ccm = base.getConnectionManager();
 			SchemeRegistry sr = ccm.getSchemeRegistry();
@@ -132,17 +129,17 @@ public class Crawler extends HttpServlet {
 
 	public void schedule(Job j) throws Exception {
 		if (background.isShutdown())
-			throw new IllegalStateException(
-					"Scheduling job when there is no crawler running");
+			throw new IllegalStateException("Scheduling job when there is no crawler running");
 		LOG.info("Scheduling job url=" + j.getUrl());
-		Table.get("crawl_queue")
-				.columns("url", "priority", "metadata")
-				.values(j.getUrl(), j.getPriority(), j.getMetadata().toString())
-				.add();
+		if (j.isHighPriority()) {
+			Table.get("crawl_queue_high").columns("url", "metadata").values(j.getUrl(), j.getMetadata().toString()).add();
+		} else {
+			Table.get("crawl_queue_normal").columns("url", "metadata").values(j.getUrl(), j.getMetadata().toString()).add();
+		}
 	}
 
 	public String get(String url) throws Exception {
-		Job j = new Job(url, 0);
+		Job j = new Job(url);
 		return internalFetchAndCache(j);
 	}
 
@@ -200,31 +197,40 @@ public class Crawler extends HttpServlet {
 			EntityUtils.consume(response.getEntity());
 		}
 
-		if (data != null && j.getCacheKey() != null
-				&& Cache.getInstance().isRunning()) {
+		if (data != null && j.getCacheKey() != null && Cache.getInstance().isRunning()) {
 			Cache.getInstance().store(j.getCacheKey(), data, j.getExpiry());
 		}
 
 		return data;
 	}
+	
+	private Row removeNextRow() throws SQLException {
+		Row r = Table.get("crawl_queue_high").random().row();
+		if (r == null) {
+			r = Table.get("crawl_queue_normal").random().row();
+			if (r != null) {
+				Table.get("crawl_queue_normal").where("id", r.column("id")).delete();
+			}
+		} else {
+			Table.get("crawl_queue_high").where("id", r.column("id")).delete();
+		}
+		return r;
+	}
 
 	class CrawlJob implements Runnable {
-
+		
 		@Override
 		public void run() {
 			try {
 				LOG.trace("new-crawl-run");
 				Row r = null;
+				boolean high = false;
 				synchronized (Crawler.class) {
-					r = Table.get("crawl_queue").limit(1)
-							.ascending("priority").row();
-					if (r == null)
+					r = removeNextRow();
+					if (r == null) 
 						return;
-					Table.get("crawl_queue").where("id", r.columnAsLong("id"))
-							.delete();
 				}
-				Job j = new Job((String) r.column("url"),
-						r.columnAsInt("priority"), null);
+				Job j = new Job((String) r.column("url"), false, null);
 				JSONObject o = new JSONObject(r.columnAsString("metadata"));
 				j.setMetadata(o);
 
@@ -238,9 +244,7 @@ public class Crawler extends HttpServlet {
 					cstats.total.incrementAndGet();
 					boolean cacheHit = false;
 					try {
-						LOG.info("begin-crawl url=" + j.getUrl() + " tag="
-								+ j.getTag() + " handler="
-								+ handlers.get(j.getTag()));
+						LOG.info("begin-crawl url=" + j.getUrl() + " tag=" + j.getTag() + " handler=" + handlers.get(j.getTag()));
 						String data = lookupCache(j);
 						if (data == null) {
 							LOG.info("cache-miss url=" + j.getUrl());
@@ -255,33 +259,26 @@ public class Crawler extends HttpServlet {
 							try {
 								handlers.get(j.getTag()).ready(j, data);
 							} catch (Throwable t) {
+								t.printStackTrace();
 								LOG.error("Error in parsing", t);
 							}
 						else
-							LOG.warn("Missing Handler for url=" + j.getUrl()
-									+ " tag=" + j.getTag());
+							LOG.warn("Missing Handler for url=" + j.getUrl() + " tag=" + j.getTag());
 					} catch (Throwable t) {
 						if (handlers.containsKey(j.getTag()))
 							handlers.get(j.getTag()).ready(j, null);
 						else
-							LOG.warn("Missing Handler for url=" + j.getUrl()
-									+ " tag=" + j.getTag());
+							LOG.warn("Missing Handler for url=" + j.getUrl() + " tag=" + j.getTag());
 						LOG.error("crawl-failed url=" + j.getUrl(), t);
 						cstats.errors.incrementAndGet();
 					}
 
-					Table.get("crawl_queue").where("id", r.columnAsLong("id"))
-							.delete();
-
 					// If we got a cache hit let's try crawling one more time.
 					if (cacheHit) {
-						r = Table.get("crawl_queue").limit(1)
-								.ascending("priority").row();
+						r = removeNextRow();
 						if (r != null) {
-							j = new Job((String) r.column("url"),
-									r.columnAsInt("priority"), null);
-							j.setMetadata(new JSONObject(r
-									.columnAsString("metadata")));
+							j = new Job((String) r.column("url"), false, null);
+							j.setMetadata(new JSONObject(r.columnAsString("metadata")));
 						} else {
 							break;
 						}
@@ -304,8 +301,7 @@ public class Crawler extends HttpServlet {
 	}
 
 	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-			throws ServletException, IOException {
+	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 	}
 
 	public void removeHandler(CrawlHandler handler) {

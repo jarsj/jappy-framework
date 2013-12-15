@@ -10,8 +10,12 @@ import java.util.TimeZone;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
 
 import com.maxmind.geoip.LookupService;
@@ -77,9 +81,14 @@ public class Net {
 		return total / count;
 	}
 
-	public static String get(String url) throws Exception {
+	public static String get(String url, int timeout) throws ClientProtocolException, IOException {
+		HttpParams params = new BasicHttpParams();
+		HttpConnectionParams.setConnectionTimeout(params, timeout * 1000);
+		HttpConnectionParams.setSoTimeout(params, timeout * 1000);
 		String data = null;
-		DefaultHttpClient httpClient = new DefaultHttpClient();
+
+		DefaultHttpClient httpClient = new DefaultHttpClient(params);
+
 		HttpGet get = new HttpGet(url);
 		HttpResponse response = httpClient.execute(get);
 		if (response.getStatusLine().getStatusCode() == 200) {
@@ -93,5 +102,9 @@ public class Net {
 		}
 
 		return data;
+	}
+
+	public static String get(String url) throws Exception {
+		return get(url, 20);
 	}
 }

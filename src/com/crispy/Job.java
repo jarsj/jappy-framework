@@ -10,25 +10,25 @@ import com.crispy.Cache.Expire;
 public class Job {
 	private String url;
 	private HashMap<String, String> headers;
-	private int priority;
 	private long expiry;
 	private String category;
 	private String ua;
 	private String cacheKey;
 	private String tag;
 	private JSONObject extra;
-
-	public Job(String url, int p) {
-		this(url, p, null);
+	private boolean highPriority;
+	
+	public Job(String url) {
+		this(url, false, null);
 	}
 
-	public Job(String url, int p, String tag) {
-		this(url, p, 0, tag);
+	public Job(String url, boolean highPriority, String tag) {
+		this(url, highPriority, 0, tag);
 	}
 
-	public Job(String url, int p, long expiry, String tag) {
+	public Job(String url, boolean highPriority, long expiry, String tag) {
 		this.url = url;
-		this.priority = p;
+		this.highPriority = highPriority;
 		this.expiry = expiry;
 		this.headers = new HashMap<String, String>();
 		this.cacheKey = url;
@@ -37,8 +37,8 @@ public class Job {
 		this.extra = new JSONObject();
 	}
 	
-	public Job(String url, int p, Expire expiry, String tag) {
-		this(url, p, expiry.expires(), tag);
+	public Job(String url, boolean highPriority, Expire expiry, String tag) {
+		this(url, highPriority, expiry.expires(), tag);
 	}
 
 
@@ -99,8 +99,8 @@ public class Job {
 		return url;
 	}
 
-	public int getPriority() {
-		return priority;
+	public boolean isHighPriority() {
+		return highPriority;
 	}
 
 	public long getExpiry() {
