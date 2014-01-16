@@ -123,7 +123,9 @@ public class DBAdmin extends HttpServlet {
 				data.put("columns", columnsJSON);
 
 				if (path.length == 2) {
-					data.put("primaryColumn", m.getPrimary().getColumn(0));
+					if (m.getPrimary() != null) {
+						data.put("primaryColumn", m.getPrimary().getColumn(0));
+					}
 					out.write(Template.expand("class:dbadmin/table.tpl", data));
 				} else if (path.length == 3) {
 					if (path[2].equals("add")) {
@@ -264,14 +266,16 @@ public class DBAdmin extends HttpServlet {
 
 			}
 			StringBuilder action = new StringBuilder();
-			action.append(String
-					.format("<a href='../dbadmin/%s/edit?c=%s&v=%s'><i class='icon-pencil'></i></a>",
-							table, m.getPrimary().getColumn(0),
-							r.columnAsString(m.getPrimary().getColumn(0))));
-			action.append(String
-					.format("<a href='../dbadmin/%s/delete?c=%s&v=%s'><i class='icon-trash'></i></a>",
-							table, m.getPrimary().getColumn(0),
-							r.columnAsString(m.getPrimary().getColumn(0))));
+			if (m.getPrimary() != null) {
+				action.append(String
+						.format("<a href='../dbadmin/%s/edit?c=%s&v=%s'><i class='icon-pencil'></i></a>",
+								table, m.getPrimary().getColumn(0),
+								r.columnAsString(m.getPrimary().getColumn(0))));
+				action.append(String
+						.format("<a href='../dbadmin/%s/delete?c=%s&v=%s'><i class='icon-trash'></i></a>",
+								table, m.getPrimary().getColumn(0),
+								r.columnAsString(m.getPrimary().getColumn(0))));
+			}
 			rowJSON.put(action.toString());
 			data.put(rowJSON);
 		}

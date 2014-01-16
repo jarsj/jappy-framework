@@ -20,7 +20,7 @@ public class Metadata {
 	CopyOnWriteArrayList<Constraint> constraints;
 	Index primary;
 	JSONObject comment;
-	
+
 	public Metadata(String table) {
 		this.name = table;
 		columns = new CopyOnWriteArrayList<Column>();
@@ -28,15 +28,15 @@ public class Metadata {
 		constraints = new CopyOnWriteArrayList<Constraint>();
 		comment = new JSONObject();
 	}
-	
+
 	public Column getColumn(String name) {
 		return Column.findByName(columns, name);
 	}
-	
+
 	public Index getIndex(String name) {
 		return Index.findByName(indexes, name);
 	}
-	
+
 	public Constraint getConstraint(String column) {
 		for (Constraint c : constraints) {
 			if (c.sourceColumn.equals(column))
@@ -44,7 +44,7 @@ public class Metadata {
 		}
 		return null;
 	}
-	
+
 	public Index getPrimary() {
 		return primary;
 	}
@@ -54,40 +54,41 @@ public class Metadata {
 		o.put("name", name);
 		JSONArray columns = new JSONArray();
 		for (Column c : this.columns) {
-			columns.put(new JSONObject().put("name", c.name).put("type",
-					c.type));
+			columns.put(new JSONObject().put("name", c.name)
+					.put("type", c.type));
 		}
 		o.put("columns", columns);
 		o.put("comment", comment);
 		return o;
 	}
-	
+
 	public String getTableName() {
 		return name;
 	}
-	
+
 	public String[] columnNames() {
 		List<String> ret = new ArrayList<String>();
 		for (Column c : columns) {
 			ret.add(c.name);
 		}
-		return ret.toArray(new String[]{});
+		return ret.toArray(new String[] {});
 	}
+
 	public CopyOnWriteArrayList<Column> getColumns() {
 		return columns;
 	}
-	
+
 	public void reorderAndRetain(final List<Column> refs) {
 		ArrayList<Column> temp = new ArrayList<Column>(columns);
-		
+
 		// First get rid of all columns that we do not need
 		Iterator<Column> iter = temp.iterator();
 		while (iter.hasNext()) {
 			Column col = iter.next();
-			if (!refs.contains(col)) 
+			if (!refs.contains(col))
 				iter.remove();
 		}
-		
+
 		Collections.sort(temp, new Comparator<Column>() {
 			@Override
 			public int compare(Column o1, Column o2) {
@@ -98,17 +99,17 @@ public class Metadata {
 		});
 		columns = new CopyOnWriteArrayList<Column>(temp);
 	}
-	
+
 	public String getDisplay() {
 		return comment.optString("display", null);
 	}
-	
+
 	public boolean dataEntry() {
 		if (name.startsWith("_"))
 			return false;
 		return !(comment.optBoolean("no-data-entry", false));
 	}
-	
+
 	/**
 	 * Admin columns must contain primary column.
 	 * 
@@ -116,36 +117,36 @@ public class Metadata {
 	 */
 	public String[] adminColumns() {
 		ArrayList<String> ret = new ArrayList<String>();
-		final String primary = getPrimary().getColumn(0);
-		ret.add(primary);
 		String admin = comment.optString("admin", null);
 		if (admin == null) {
+			if (primary != null) {
+				final String primary = getPrimary().getColumn(0);
+				ret.add(primary);
+			}
 			int c = 0;
 			while (ret.size() < 5 && c < columns.size()) {
-				if (columns.get(c).name.equals(primary)) {
-					c++;
-					continue;
+				String name = columns.get(c).name;
+				if (!ret.contains(name)) {
+					ret.add(name);
 				}
-				ret.add(columns.get(c).name);
 				c++;
 			}
 		} else {
 			String[] admins = StringUtils.split(admin, ",");
 			for (Column c : columns) {
-				if (c.getName().equals(primary))
-					continue;
 				if (ArrayUtils.contains(admins, c.getName()))
 					ret.add(c.getName());
 			}
 		}
-		return ret.toArray(new String[]{});
+		return ret.toArray(new String[] {});
 	}
-	
+
 	public void setAdminColumns(String[] cols) throws Exception {
 		comment.put("admin", StringUtils.join(cols, ","));
-		Table.get("_metadata").columns("metadata").values(comment.toString()).where("table", name).update();
+		Table.get("_metadata").columns("metadata").values(comment.toString())
+				.where("table", name).update();
 	}
-	
+
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();

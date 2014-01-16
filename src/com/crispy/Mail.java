@@ -47,7 +47,7 @@ public class Mail implements Runnable {
 
 		background = Executors.newSingleThreadScheduledExecutor();
 		queue = new ConcurrentHashMap<String, LinkedBlockingQueue<String>>();
-		background.scheduleAtFixedRate(this, 5, 5, TimeUnit.MINUTES);
+		background.scheduleAtFixedRate(this, 0, 1, TimeUnit.MINUTES);
 	}
 
 	public static Mail getInstance() {

@@ -111,14 +111,13 @@ public class Job {
 		return headers;
 	}
 
-	public static void setITunes9Headers(Job j, String storeId) {
+	public static void setITunes9Headers(Job j, int storeId) {
 		j.setHeader("Host", "itunes.apple.com");
 		j.setHeader("Accept-Language", "en-us, en;q=0.50");
-		j.setHeader("X-Apple-Store-Front", storeId);
+		j.setHeader("X-Apple-Store-Front", Integer.toString(storeId));
 		j.setHeader("X-Apple-Tz", "3600");
 		j.setUserAgent("iTunes/9.2.1 (Macintosh; Intel Mac OS X 10.5.8) AppleWebKit/533.16");
 		j.setCacheKey(j.getUrl() + "#" + storeId);
-
 	}
 
 	public static void setITunes11Headers(Job j, String storeId) {

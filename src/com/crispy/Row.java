@@ -260,4 +260,16 @@ public class Row implements IJSONConvertible {
 		}
 		t.columns(column).values(value).update();
 	}
+	
+	public void delete() throws Exception {
+		for (String table : tables) {
+			Metadata meta = DB.getMetadata(table);
+			Index primary = meta.getPrimary();
+			Table t = Table.get(table);
+			for (String col : primary.columns) {
+				t.where(col, column(col));
+			}
+			t.delete();
+		}
+	}
 }

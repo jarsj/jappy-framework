@@ -24,12 +24,17 @@ public class Net {
 	private static final Log LOG = Log.get("net");
 	private static LookupService IP_SERVICE;
 
-	public static void init(String geoURL) throws FileNotFoundException, IOException {
+	public static void init(String geoURL) throws FileNotFoundException,
+			IOException {
 		if (geoURL != null) {
-			File tmpFile = File.createTempFile("GeoIP", "dat");
-			URL u = new URL(geoURL);
-			IOUtils.copy(u.openStream(), new FileOutputStream(tmpFile));
-			IP_SERVICE = new LookupService(tmpFile);
+			try {
+				File tmpFile = File.createTempFile("GeoIP", "dat");
+				URL u = new URL(geoURL);
+				IOUtils.copy(u.openStream(), new FileOutputStream(tmpFile));
+				IP_SERVICE = new LookupService(tmpFile);
+			} catch (Exception e) {
+				LOG.warn("IP Service not initialized");
+			}
 		} else {
 			LOG.warn("IP Service not initialized");
 		}
@@ -44,14 +49,16 @@ public class Net {
 	}
 
 	public static String getCountryCodeFromName(String name) {
-		Integer index = (Integer) IP_SERVICE.getHashmapcountrynametoindex().get(name);
+		Integer index = (Integer) IP_SERVICE.getHashmapcountrynametoindex()
+				.get(name);
 		if (index == null)
 			return null;
 		return IP_SERVICE.getCountrycode()[index];
 	}
 
 	public static String getCountryNameFromCode(String code) {
-		Integer index = (Integer) IP_SERVICE.getHashmapcountrycodetoindex().get(code);
+		Integer index = (Integer) IP_SERVICE.getHashmapcountrycodetoindex()
+				.get(code);
 		return IP_SERVICE.getCountryname()[index];
 	}
 
@@ -68,7 +75,8 @@ public class Net {
 	public static int timezoneOffset(String countryCode) {
 		if (countryCode.equals("--"))
 			return 0;
-		String[] zoneIds = com.ibm.icu.util.TimeZone.getAvailableIDs(countryCode);
+		String[] zoneIds = com.ibm.icu.util.TimeZone
+				.getAvailableIDs(countryCode);
 		int total = 0;
 		int count = 0;
 		for (String zone : zoneIds) {
@@ -81,7 +89,8 @@ public class Net {
 		return total / count;
 	}
 
-	public static String get(String url, int timeout) throws ClientProtocolException, IOException {
+	public static String get(String url, int timeout)
+			throws ClientProtocolException, IOException {
 		HttpParams params = new BasicHttpParams();
 		HttpConnectionParams.setConnectionTimeout(params, timeout * 1000);
 		HttpConnectionParams.setSoTimeout(params, timeout * 1000);

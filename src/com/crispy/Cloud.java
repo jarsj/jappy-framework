@@ -202,6 +202,20 @@ public class Cloud {
 		RunInstancesResult resp = ec2.runInstances(rir);
 		return resp.getReservation().getInstances().get(0).getInstanceId();
 	}
+	
+	public String[] launch(int min, int max) {
+		RunInstancesRequest rir = new RunInstancesRequest();
+		rir.withImageId(ami).withSecurityGroups(securityGroup).withKeyName(keyPair).withInstanceType(instanceType).withMinCount(min).withMaxCount(max);
+		if (userData != null) {
+				rir.withUserData(new String(Base64.encodeBase64(userData.getBytes())));
+		}
+		RunInstancesResult resp = ec2.runInstances(rir);
+		String[] ret = new String[resp.getReservation().getInstances().size()];
+		for (int i = 0; i < ret.length; i++) {
+			ret[i] = resp.getReservation().getInstances().get(i).getInstanceId();
+		}
+		return ret;
+	}
 
 	public Cloud cacheKeys() {
 		keys = new TreeSet<String>();
@@ -326,7 +340,7 @@ public class Cloud {
 			return Net.get("http://169.254.169.254/latest/meta-data/instance-id", 5).trim();
 		} catch (Exception e) {
 			LOG.error(e.getMessage(), e);
-			return null;
+			return "local";
 		}
 	}
 
