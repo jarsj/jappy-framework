@@ -20,14 +20,10 @@ import com.crispy.net.Url;
 public class Server implements ServletContextListener {
 	
 	private static ServletContext tomcat_context;
-	private static WebAppContext jetty_context;
-	private static org.eclipse.jetty.server.Server jettyServer;
 	
 	public static String getContextPath() {
 		if (tomcat_context != null)
 			return tomcat_context.getContextPath();
-		if (jetty_context != null)
-			return jetty_context.getContextPath();
 		return null;
 	}
 	
@@ -46,48 +42,6 @@ public class Server implements ServletContextListener {
 					false, "/*");
 		} catch (Throwable t) {
 			t.printStackTrace();
-		}
-	}
-	
-	/**
-	 * Nothing to do while starting tomcat as context will get initialized automatically. 
-	 * @param host
-	 */
-	public static void startTomcat() {
-	}
-	
-	public static void startJetty(int port, Class ... servlets) throws Exception {
-		jettyServer = new org.eclipse.jetty.server.Server(port);
-		
-		WebAppContext context = new WebAppContext();
-		
-		context.setResourceBase("web/");
-		context.setContextPath("/");
-		context.addServlet(DBAdmin.class, "/dbadmin/*");
-		context.addServlet(Image.class, "/resource/*");
-		context.addServlet(Image.class, "/resource");
-		
-		for (int i = 0; i < servlets.length; i++) {
-			WebServlet annotation = (WebServlet) servlets[i].getAnnotation(WebServlet.class);
-			for (String path : annotation.urlPatterns()) {
-				context.addServlet(servlets[i], path);
-			}
-		}
-		
-		context.addFilter(Url.class, "/*", EnumSet.of(DispatcherType.REQUEST));
-		jettyServer.setHandler(context);
-		jettyServer.start();
-		
-		
-		
-		Server.jetty_context = context;
-	}
-	
-	
-	
-	public static void stop() throws Exception {
-		if (jettyServer != null) {
-			jettyServer.stop();
 		}
 	}
 }
