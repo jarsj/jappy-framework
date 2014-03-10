@@ -12,9 +12,11 @@ import java.util.concurrent.TimeUnit;
 
 import javax.mail.Authenticator;
 import javax.mail.Message;
+import javax.mail.MessagingException;
 import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.mail.Transport;
+import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
@@ -54,7 +56,16 @@ public class Mail implements Runnable {
 		return INSTANCE;
 	}
 
-	public void sendMail(String to, String subject, String body) {
+	public void send(String from, String to, String subject, String body)
+			throws Exception {
+		internalSend(new Authenticator() {
+			protected PasswordAuthentication getPasswordAuthentication() {
+				return new PasswordAuthentication(username, password);
+			}
+		}, from, to, subject, body);
+	}
+
+	public void queue(String to, String subject, String body) {
 		LinkedBlockingQueue<String> q = queue.get(to);
 		if (q == null) {
 			q = new LinkedBlockingQueue<String>();
@@ -68,29 +79,39 @@ public class Mail implements Runnable {
 		}
 	}
 
+	private void internalSend(Authenticator auth, String from, String to,
+			String subject, String body) throws AddressException,
+			MessagingException {
+		Session session = Session.getDefaultInstance(props, auth);
+		MimeMessage message = new MimeMessage(session);
+		message.setFrom(new InternetAddress(from));
+		message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
+		message.setSubject(subject);
+		message.setText(body);
+		Transport.send(message);
+
+	}
+
 	@Override
 	public void run() {
 		try {
-			
+
 			Authenticator auth = new Authenticator() {
 				protected PasswordAuthentication getPasswordAuthentication() {
-					return new PasswordAuthentication(username,
-							password);
+					return new PasswordAuthentication(username, password);
 				}
 			};
-			
-			Session session = Session.getDefaultInstance(props, auth);
-			
+
 			for (Map.Entry<String, LinkedBlockingQueue<String>> entry : queue
 					.entrySet()) {
 				String to = entry.getKey();
 				LinkedBlockingQueue<String> q = entry.getValue();
-				
+
 				ArrayList<String> t = new ArrayList<String>();
 				q.drainTo(t);
 
 				HashMap<String, StringBuilder> bySubjects = new HashMap<String, StringBuilder>();
-				
+
 				for (String mail : t) {
 					JSONObject o = new JSONObject(mail);
 					StringBuilder body = bySubjects.get(o.getString("subject"));
@@ -101,15 +122,11 @@ public class Mail implements Runnable {
 					body.append("\n\n");
 					body.append(o.getString("body"));
 				}
-					
-				for (Map.Entry<String, StringBuilder> entry2 : bySubjects.entrySet()) {
-					MimeMessage message = new MimeMessage(session);
-					message.setFrom(new InternetAddress("harsh@zopte.com"));
-					message.addRecipient(Message.RecipientType.TO,
-							new InternetAddress(to));
-					message.setSubject(entry2.getKey());
-					message.setText(entry2.getValue().toString());
-					Transport.send(message);
+
+				for (Map.Entry<String, StringBuilder> entry2 : bySubjects
+						.entrySet()) {
+					internalSend(auth, "harsh@zopte.com", to, entry2.getKey(),
+							entry2.getValue().toString());
 				}
 			}
 		} catch (Throwable t) {
@@ -118,6 +135,12 @@ public class Mail implements Runnable {
 	}
 
 	public void shutdown() {
+		if (background != null) {
+			background.shutdown();
+		}
+	}
+
+	public void shutdownNow() {
 		if (background != null) {
 			background.shutdownNow();
 		}

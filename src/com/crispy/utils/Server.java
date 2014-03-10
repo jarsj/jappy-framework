@@ -8,11 +8,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
-import javax.servlet.annotation.WebServlet;
 
-import org.eclipse.jetty.webapp.WebAppContext;
-
-import com.crispy.db.DBAdmin;
 import com.crispy.log.Log;
 import com.crispy.net.Url;
 

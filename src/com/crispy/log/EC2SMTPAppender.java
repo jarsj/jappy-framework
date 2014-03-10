@@ -51,7 +51,7 @@ public class EC2SMTPAppender extends ConsoleAppender {
 					}
 				}
 
-				Mail.getInstance().sendMail(
+				Mail.getInstance().queue(
 						to,
 						"Error: " + event.getLogger().getName() + ":"
 								+ event.getMessage(), body);

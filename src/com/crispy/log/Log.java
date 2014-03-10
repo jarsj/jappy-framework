@@ -39,7 +39,7 @@ public class Log {
 	private Log(String name) {
 		this(name, false);
 	}
-	
+
 	private Log(String name, boolean async) {
 		this.name = name;
 		this.prefix = "";
@@ -68,7 +68,7 @@ public class Log {
 	public static Log get(String name) {
 		return new Log(name);
 	}
-	
+
 	public static Log get(String name, boolean async) {
 		return new Log(name, async);
 	}
@@ -122,7 +122,29 @@ public class Log {
 	public Log daily(String folder, Level l) {
 		return daily(folder, l, "%p %d{yyyy-MM-dd HH:mm:ss}: %m%n");
 	}
-	
+
+	public Log s3(Level l, String bucket, String folder, String pattern, String maxSize) {
+		try {
+			S3Appender appender = new S3Appender(new PatternLayout(pattern),
+					new File("/mnt/tmp"), bucket, folder);
+			appender.setName("jappy-s3");
+			appender.setMaxFileSize(maxSize);
+			appender.setThreshold(l);
+			
+			if (!async) {
+				logger.removeAppender("jappy-s3");
+				logger.addAppender(appender);
+			} else {
+				AsyncAppender aa = (AsyncAppender)logger.getAppender("async-appender");
+				aa.removeAppender("jappy-s3");
+				aa.addAppender(appender);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return this;
+	}
+
 	public Log daily(String folder, Level l, String pattern) {
 		try {
 			FileUtils.forceMkdir(new File(folder));
