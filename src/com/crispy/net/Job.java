@@ -5,8 +5,7 @@ import java.util.HashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.crispy.utils.Cache;
-import com.crispy.utils.Cache.Expire;
+import com.crispy.net.Cache.Expire;
 
 public class Job {
 	private String url;

@@ -7,7 +7,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.imageio.ImageIO;
@@ -113,11 +112,8 @@ public class Image extends HttpServlet {
 
 		File tmp = File.createTempFile("image", ext);
 		IOUtils.copy(input, new FileOutputStream(tmp));
-		if (Cloud.connected)
-			Cloud.s3(bucket).create().allowRead().neverExpire().upload(parent + nextID + "." + ext, tmp);
-		String url = "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext;
-		Cache.getInstance().storeUrl(new URL(url), tmp);
-		return url;
+		Cloud.s3(bucket).create().allowRead().neverExpire().upload(parent + nextID + "." + ext, tmp);
+		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext;
 	}
 
 	public static File scale(File source, int width, int height) throws IOException {
@@ -126,24 +122,6 @@ public class Image extends HttpServlet {
 		return internalScale(image, extension, width, height);
 	}
 
-	public static int[] dimensions(URL source) throws IOException {
-		BufferedImage image = ImageIO.read(Cache.getInstance().fetchUrl(source));
-		if (image == null) {
-			return new int[] { -1, -1 };
-		}
-		return new int[] { image.getWidth(), image.getHeight() };
-	}
-
-	public static File scale(URL source, int width, int height) throws IOException {
-		String extension = source.getPath().substring(source.getPath().lastIndexOf(".") + 1);
-		return internalScale(ImageIO.read(Cache.getInstance().fetchUrl(source)), extension, width, height);
-	}
-
-	public static File scale(URL source, int size) throws IOException {
-		String extension = source.getPath().substring(source.getPath().lastIndexOf(".") + 1);
-		return internalScale(ImageIO.read(Cache.getInstance().fetchUrl(source)), extension, size);
-	}
-	
 	public static File scale(File source, int size) throws IOException {
 		String extension = source.getPath().substring(source.getAbsolutePath().lastIndexOf(".") + 1);
 		return internalScale(ImageIO.read(source), extension, size);

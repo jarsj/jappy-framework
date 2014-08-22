@@ -192,15 +192,13 @@ public class Column {
 						try {
 							return Image.uploadS3(s3Bucket, new FileInputStream((File) value), ((File) value).getName());
 						} catch (Exception e) {
-							e.printStackTrace();
-							return null;
+							throw new IllegalStateException("Can not upload " + value, e);
 						}
 					} else if (value instanceof URL) {
 						try {
 							return Image.uploadS3(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath());
 						} catch (Exception e) {
-							e.printStackTrace();
-							return null;
+							throw new IllegalStateException("Can not upload " + value.toString(), e);
 						}
 					} else {
 						return value.toString();

@@ -2,10 +2,13 @@ package com.crispy.cloud;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,8 +55,8 @@ import com.crispy.db.Metadata;
 import com.crispy.db.Row;
 import com.crispy.db.Table;
 import com.crispy.log.Log;
+import com.crispy.net.Cache;
 import com.crispy.net.Net;
-import com.crispy.utils.Cache;
 
 /**
  * Cloud
@@ -76,6 +79,7 @@ public class Cloud {
 	public static void init(String accessKey, String secretKey) {
 		credentials = new BasicAWSCredentials(accessKey, secretKey);
 		connected = false;
+		System.setProperty("com.amazonaws.sdk.disableCertChecking", "true");
 		// TODO : Probably don't want to do this.
 		reloadBuckets();
 	}
@@ -107,13 +111,14 @@ public class Cloud {
 				mBuckets.put(b.getName(), true);
 			}
 			connected = true;
+			client.shutdown();
 		} catch (AmazonClientException t) {
 			LOG.error("Unable to connect with amazon");
 		}
 		LOG.info("Initialize S3 with " + mBuckets.size() + " buckets");
 	}
 
-	private AmazonS3 s3;
+	private AmazonS3Client s3;
 	private String bucket;
 	private AccessControlList acl;
 
@@ -201,6 +206,7 @@ public class Cloud {
 		TerminateInstancesRequest tir = new TerminateInstancesRequest();
 		tir.withInstanceIds(instanceId);
 		ec2.terminateInstances(tir);
+		ec2.shutdown();
 	}
 
 	public String launch() {
@@ -208,20 +214,23 @@ public class Cloud {
 		rir.withImageId(ami).withSecurityGroups(securityGroup).withKeyName(keyPair).withInstanceType(instanceType).withMinCount(1).withMaxCount(1)
 				.withUserData(new String(Base64.encodeBase64(userData.getBytes())));
 		RunInstancesResult resp = ec2.runInstances(rir);
+		ec2.shutdown();
 		return resp.getReservation().getInstances().get(0).getInstanceId();
 	}
-	
+
 	public String[] launch(int min, int max) {
 		RunInstancesRequest rir = new RunInstancesRequest();
-		rir.withImageId(ami).withSecurityGroups(securityGroup).withKeyName(keyPair).withInstanceType(instanceType).withMinCount(min).withMaxCount(max);
+		rir.withImageId(ami).withSecurityGroups(securityGroup).withKeyName(keyPair).withInstanceType(instanceType).withMinCount(min)
+				.withMaxCount(max);
 		if (userData != null) {
-				rir.withUserData(new String(Base64.encodeBase64(userData.getBytes())));
+			rir.withUserData(new String(Base64.encodeBase64(userData.getBytes())));
 		}
 		RunInstancesResult resp = ec2.runInstances(rir);
 		String[] ret = new String[resp.getReservation().getInstances().size()];
 		for (int i = 0; i < ret.length; i++) {
 			ret[i] = resp.getReservation().getInstances().get(i).getInstanceId();
 		}
+		ec2.shutdown();
 		return ret;
 	}
 
@@ -246,24 +255,70 @@ public class Cloud {
 		return keys;
 	}
 
-	public String download(String key) throws IOException {
-		GetObjectRequest request = new GetObjectRequest(bucket, key);
-		S3Object o = s3.getObject(request);
-		if (o == null) return null;
-		return IOUtils.toString(o.getObjectContent());
+	public String download(String key) {
+		try {
+			GetObjectRequest request = new GetObjectRequest(bucket, key);
+			S3Object o = s3.getObject(request);
+			if (o == null)
+				return null;
+			String ret = IOUtils.toString(o.getObjectContent());
+			return ret;
+		} catch (Throwable e) {
+			throw new IllegalArgumentException("Error downloading key = " + key, e);
+		} finally {
+			s3.shutdown();
+		}
 	}
 	
+	public void download(String key, File local) {
+		try {
+			GetObjectRequest request = new GetObjectRequest(bucket, key);
+			S3Object o = s3.getObject(request);
+			if (o == null)
+				return;
+			
+			FileOutputStream fout = new FileOutputStream(local);
+			IOUtils.copy(o.getObjectContent(), fout);
+			fout.flush();
+			fout.close();
+		} catch (Throwable e) {
+			throw new IllegalArgumentException("Error downloading key = " + key, e);
+		} finally {
+			s3.shutdown();
+		}
+	}
+	
+
 	public void remove(String key) {
 		DeleteObjectRequest dor = new DeleteObjectRequest(bucket, key);
 		s3.deleteObject(dor);
+		s3.shutdown();
 	}
-	
+
 	public Cloud upload(String key, String data) throws UnsupportedEncodingException {
 		PutObjectRequest request = new PutObjectRequest(bucket, key, new StringInputStream(data), new ObjectMetadata());
 		s3.putObject(request);
 		return this;
 	}
-	
+
+	public List<String> list(String key) {
+		try {
+			ListObjectsRequest request = new ListObjectsRequest().withBucketName(bucket).withPrefix(key);
+			List<String> ret = new ArrayList<>();
+			ObjectListing listing;
+			do {
+				listing = s3.listObjects(request);
+				for (S3ObjectSummary summary : listing.getObjectSummaries()) {
+					ret.add(summary.getKey());
+				}
+				request.setMarker(listing.getNextMarker());
+			} while (listing.isTruncated());
+			return ret;
+		} finally {
+			s3.shutdown();
+		}
+	}
+
 	public Cloud upload(String key, File value) throws FileNotFoundException {
 		ObjectMetadata metadata = new ObjectMetadata();
 		if (value.getName().endsWith("png")) {
@@ -311,29 +366,6 @@ public class Cloud {
 		return this;
 	}
 
-	public static void cacheS3(int N) throws IOException {
-		int done = 0;
-		for (Metadata m : DB.getTables()) {
-			for (Column c : m.getColumns()) {
-				if (c.getComment().startsWith("s3:")) {
-					for (Row r : Table.get(m.getTableName()).columns(c.getName()).rows()) {
-						URL u = r.columnAsUrl(c.getName());
-						if (u == null)
-							continue;
-						if (u.toString().endsWith(".psd"))
-							continue;
-						if (!Cache.getInstance().existsInCache(u)) {
-							Cache.getInstance().fetchUrl(u);
-							done++;
-							if (done >= N)
-								return;
-						}
-					}
-				}
-			}
-		}
-	}
-
 	public static String userData() {
 		try {
 			return Net.get("http://169.254.169.254/latest/user-data", 5);
@@ -342,7 +374,7 @@ public class Cloud {
 			return null;
 		}
 	}
-	
+
 	public static String instanceId() {
 		try {
 			return Net.get("http://169.254.169.254/latest/meta-data/instance-id", 5).trim();
@@ -350,6 +382,13 @@ public class Cloud {
 			LOG.error(e.getMessage(), e);
 			return "local";
 		}
+	}
+
+	public void shutdown() {
+		if (ec2 != null)
+			ec2.shutdown();
+		if (s3 != null)
+			s3.shutdown();
 	}
 
 	public boolean isTerminated(String instanceId) {

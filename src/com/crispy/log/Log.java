@@ -3,6 +3,7 @@ package com.crispy.log;
 import java.io.File;
 import java.net.URLEncoder;
 import java.util.Enumeration;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Appender;
@@ -43,7 +44,6 @@ public class Log {
 	private Log(String name, boolean async) {
 		this.name = name;
 		this.prefix = "";
-		this.async = async;
 		this.logger = Logger.getLogger(name);
 		if (async) {
 			async();
@@ -104,11 +104,11 @@ public class Log {
 	}
 
 	public Log async() {
+		if (this.async)
+			return this;
 		this.async = true;
-
 		AsyncAppender asyncAppender = new AsyncAppender();
-		asyncAppender.setName("async-appender");
-
+		asyncAppender.setName(name + "-async-appender");
 		Enumeration appenders = logger.getAllAppenders();
 		while (appenders.hasMoreElements()) {
 			Appender a = (Appender) appenders.nextElement();
@@ -123,19 +123,19 @@ public class Log {
 		return daily(folder, l, "%p %d{yyyy-MM-dd HH:mm:ss}: %m%n");
 	}
 
-	public Log s3(Level l, String bucket, String folder, String pattern, String maxSize) {
+	public Log s3(Level l, String bucket, String folder, String pattern, String maxSize, long duration, TimeUnit period) {
 		try {
-			S3Appender appender = new S3Appender(new PatternLayout(pattern),
-					new File("/mnt/tmp"), bucket, folder);
+			S3Appender appender = new S3Appender(new PatternLayout(pattern), new File("/mnt/tmp"), bucket, folder);
 			appender.setName("jappy-s3");
 			appender.setMaxFileSize(maxSize);
 			appender.setThreshold(l);
-			
+			appender.setRolloverTime(duration, period);
+
 			if (!async) {
 				logger.removeAppender("jappy-s3");
 				logger.addAppender(appender);
 			} else {
-				AsyncAppender aa = (AsyncAppender)logger.getAppender("async-appender");
+				AsyncAppender aa = (AsyncAppender) logger.getAppender(name + "-async-appender");
 				aa.removeAppender("jappy-s3");
 				aa.addAppender(appender);
 			}
@@ -145,14 +145,16 @@ public class Log {
 		return this;
 	}
 
+	public Log s3(Level l, String bucket, String folder, String pattern, String maxSize) {
+		return s3(l, bucket, folder, pattern, maxSize, Long.MAX_VALUE, TimeUnit.MINUTES);
+	}
+
 	public Log daily(String folder, Level l, String pattern) {
 		try {
 			FileUtils.forceMkdir(new File(folder));
 
-			DailyRollingFileAppender appender = new DailyRollingFileAppender(
-					new PatternLayout(pattern),
-					new File(folder + "/" + name).getAbsolutePath(),
-					"dd-MM-yyyy");
+			DailyRollingFileAppender appender = new DailyRollingFileAppender(new PatternLayout(pattern),
+					new File(folder + "/" + name).getAbsolutePath(), "dd-MM-yyyy");
 			appender.setName("jappy-daily");
 			appender.setThreshold(l);
 
@@ -160,8 +162,7 @@ public class Log {
 				logger.removeAppender("jappy-daily");
 				logger.addAppender(appender);
 			} else {
-				AsyncAppender aa = (AsyncAppender) logger
-						.getAppender("async-appender");
+				AsyncAppender aa = (AsyncAppender) logger.getAppender(name + "-async-appender");
 				aa.removeAppender("jappy-daily");
 				aa.addAppender(appender);
 			}
@@ -174,9 +175,8 @@ public class Log {
 	public Log size(String folder, int maxSizeInMB, Level l) {
 		try {
 			FileUtils.forceMkdir(new File(folder));
-			RollingFileAppender appender = new RollingFileAppender(
-					new PatternLayout("%p %d{yyyy-MM-dd HH:mm:ss}: %m%n"),
-					new File(folder + "/" + name).getAbsolutePath());
+			RollingFileAppender appender = new RollingFileAppender(new PatternLayout("%p %d{yyyy-MM-dd HH:mm:ss}: %m%n"), new File(folder + "/"
+					+ name).getAbsolutePath());
 			appender.setName("jappy-size");
 			appender.setMaxFileSize(maxSizeInMB + "MB");
 			appender.setThreshold(l);
@@ -186,8 +186,7 @@ public class Log {
 				logger.removeAppender("jappy-size");
 				logger.addAppender(appender);
 			} else {
-				AsyncAppender aa = (AsyncAppender) logger
-						.getAppender("async-appender");
+				AsyncAppender aa = (AsyncAppender) logger.getAppender(name + "-async-appender");
 				aa.removeAppender("jappy-size");
 				aa.addAppender(appender);
 			}
@@ -213,8 +212,7 @@ public class Log {
 			logger.removeAppender("jappy-console");
 			logger.addAppender(console);
 		} else {
-			AsyncAppender aa = (AsyncAppender) logger
-					.getAppender("async-appender");
+			AsyncAppender aa = (AsyncAppender) logger.getAppender(name + "-async-appender");
 			aa.removeAppender("jappy-console");
 			aa.addAppender(console);
 		}
@@ -232,8 +230,7 @@ public class Log {
 			logger.removeAppender("jappy-email");
 			logger.addAppender(email);
 		} else {
-			AsyncAppender aa = (AsyncAppender) logger
-					.getAppender("async-appender");
+			AsyncAppender aa = (AsyncAppender) logger.getAppender(name + "-async-appender");
 			aa.removeAppender("jappy-email");
 			aa.addAppender(email);
 		}

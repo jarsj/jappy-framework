@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
@@ -27,7 +28,11 @@ public class S3Appender extends FileAppender implements Runnable {
 	 * The default maximum file size is 1MB.
 	 */
 	protected long maxFileSize = 10 * 1024 * 1024;
-
+	private TimeUnit rolloverTimeUnit = TimeUnit.MINUTES;
+	private long rolloverTimePeriod = Long.MAX_VALUE;
+	private long lastRollOver = 0;
+	private long rolloverMilliseconds = rolloverTimeUnit.toMillis(rolloverTimePeriod);
+	
 	private File localFolder;
 	private LinkedBlockingQueue<String> queue;
 	private String bucket;
@@ -53,6 +58,7 @@ public class S3Appender extends FileAppender implements Runnable {
 		File tmpFile = new File(localFolder, UUID.randomUUID().toString());
 		this.setTmpFile(tmpFile.getAbsolutePath());
 		super.layout = layout;
+		lastRollOver = System.currentTimeMillis();
 		s3UploaderThread = new Thread(this);
 		terminateUploaderThread.set(false);
 		s3UploaderThread.start();
@@ -68,8 +74,12 @@ public class S3Appender extends FileAppender implements Runnable {
 		return maxFileSize;
 	}
 
-	public void rollOver() {
+	/**
+	 * Rollover needs to be synchronized. 
+	 */
+	public synchronized void rollOver() {
 		queue.add(this.getFile());
+		lastRollOver = System.currentTimeMillis();
 		File tmpFile = new File(localFolder, UUID.randomUUID().toString());
 		try {
 			this.setTmpFile(tmpFile.getAbsolutePath());
@@ -77,7 +87,7 @@ public class S3Appender extends FileAppender implements Runnable {
 		}
 	}
 
-	public synchronized void setTmpFile(String fileName) throws IOException {
+	private synchronized void setTmpFile(String fileName) throws IOException {
 		super.setFile(fileName, false, this.bufferedIO, this.bufferSize);
 	}
 
@@ -89,6 +99,12 @@ public class S3Appender extends FileAppender implements Runnable {
 		maxFileSize = OptionConverter.toFileSize(value, maxFileSize + 1);
 	}
 
+	public void setRolloverTime(long duration, TimeUnit unit) {
+		this.rolloverTimePeriod = duration;
+		this.rolloverTimeUnit = unit;
+		this.rolloverMilliseconds = unit.toMillis(duration);
+	}
+	
 	protected void setQWForFiles(Writer writer) {
 		this.qw = new CountingQuietWriter(writer, errorHandler);
 	}
@@ -100,7 +116,8 @@ public class S3Appender extends FileAppender implements Runnable {
 		super.subAppend(event);
 		if (fileName != null && qw != null) {
 			long size = ((CountingQuietWriter) qw).getCount();
-			if (size >= maxFileSize) {
+			long timeSinceLastRoll = System.currentTimeMillis() - lastRollOver;
+			if (size >= maxFileSize || timeSinceLastRoll >= rolloverMilliseconds) {
 				rollOver();
 			}
 		}
@@ -127,6 +144,7 @@ public class S3Appender extends FileAppender implements Runnable {
 					Cloud.s3(bucket).upload(s3Folder + "/" + f.getName(), f);
 					FileUtils.deleteQuietly(f);
 				} catch (Exception ex) {
+					Log.get("system").error(ex.getMessage(), ex);
 					queue.add(fileName);
 				}
 			}

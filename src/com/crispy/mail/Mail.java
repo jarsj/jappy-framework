@@ -22,6 +22,8 @@ import javax.mail.internet.MimeMessage;
 
 import org.json.JSONObject;
 
+import com.crispy.log.Log;
+
 /**
  * Mail component.
  * 
@@ -56,13 +58,16 @@ public class Mail implements Runnable {
 		return INSTANCE;
 	}
 
-	public void send(String from, String to, String subject, String body)
-			throws Exception {
-		internalSend(new Authenticator() {
-			protected PasswordAuthentication getPasswordAuthentication() {
-				return new PasswordAuthentication(username, password);
-			}
-		}, from, to, subject, body);
+	public void send(String from, String to, String subject, String body)  {
+		try {
+			internalSend(new Authenticator() {
+				protected PasswordAuthentication getPasswordAuthentication() {
+					return new PasswordAuthentication(username, password);
+				}
+			}, from, to, subject, body);
+		} catch (Exception e) {
+			
+		}
 	}
 
 	public void queue(String to, String subject, String body) {
