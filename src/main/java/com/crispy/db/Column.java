@@ -2,6 +2,7 @@ package com.crispy.db;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.net.URL;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -12,6 +13,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.apache.commons.lang.StringEscapeUtils;
 
@@ -65,7 +67,7 @@ public class Column {
 	public static Column mediumtext(String name) {
 		return new Column(name, "MEDIUMTEXT");
 	}
-	
+
 	public static Column floating(String name) {
 		return new Column(name, "FLOAT");
 	}
@@ -151,9 +153,7 @@ public class Column {
 		if (!(o instanceof Column))
 			return false;
 		Column other = (Column) o;
-		return Objects.equals(name, other.name)
-				&& Objects.equals(type, other.type)
-				&& Objects.equals(comment, other.comment);
+		return Objects.equals(name, other.name) && Objects.equals(type, other.type) && Objects.equals(comment, other.comment);
 	}
 
 	public static Column findByName(Collection<Column> columns, String name) {
@@ -177,7 +177,7 @@ public class Column {
 						} catch (Exception e) {
 							return null;
 						}
-					} else if (value instanceof URL) { 
+					} else if (value instanceof URL) {
 						try {
 							return Image.uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value).getPath());
 						} catch (Exception e) {
@@ -267,8 +267,7 @@ public class Column {
 				return value;
 			if (value instanceof Long)
 				return new Timestamp((Long) value);
-			throw new IllegalArgumentException(
-					"Value should be of type Timestamp");
+			throw new IllegalArgumentException("Value should be of type Timestamp");
 		}
 		if (type.equals("INT")) {
 			if (value.toString().trim().length() == 0)
@@ -285,7 +284,7 @@ public class Column {
 				return null;
 			return Boolean.parseBoolean(value.toString().trim());
 		}
-		
+
 		return value;
 	}
 
@@ -320,8 +319,7 @@ public class Column {
 			}
 		}
 		if (type.startsWith("VARCHAR")) {
-			String temp = type.substring(type.indexOf('(') + 1,
-					type.indexOf(')'));
+			String temp = type.substring(type.indexOf('(') + 1, type.indexOf(')'));
 			int length = Integer.parseInt(temp);
 			if (length < 200) {
 				return SimpleType.TEXT;
@@ -381,6 +379,14 @@ public class Column {
 		} catch (ParseException e) {
 			return null;
 		}
+	}
+
+	public boolean isCandidateForNullValue(Object value) {
+		if (value == null) return true;
+		if (!(value instanceof String)) return false;
+		String sValue = (String) value;
+		if (sValue.trim().length() != 0) return false;
+		return type.equals("BIGINT") || type.equals("INT") || type.equals("FLOAT");
 	}
 
 }

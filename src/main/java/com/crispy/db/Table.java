@@ -1,5 +1,7 @@
 package com.crispy.db;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -9,11 +11,22 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -33,6 +46,22 @@ public class Table {
 
 		public String getType() {
 			return engineType;
+		}
+	}
+
+	private enum JoinType {
+		LEFT, RIGHT, NORMAL;
+
+		public String sqlString() {
+			switch (this) {
+			case LEFT:
+				return "LEFT JOIN";
+			case RIGHT:
+				return "RIGHT JOIN";
+			case NORMAL:
+				return "JOIN";
+			}
+			return null;
 		}
 	}
 
@@ -119,6 +148,7 @@ public class Table {
 
 	private static final Log LOG = Log.get("db");
 
+	private JoinType joinType;
 	private ArrayList<Table> joins;
 
 	private boolean random;
@@ -181,6 +211,7 @@ public class Table {
 		random = false;
 		unique = false;
 		ignore = false;
+		joinType = JoinType.NORMAL;
 		limit = -1;
 		start = -1;
 		this.name = name;
@@ -200,6 +231,22 @@ public class Table {
 	public Table columns(String... name) {
 		columnNames = new ArrayList<String>();
 		columnNames.addAll(Arrays.asList(name));
+		return this;
+	}
+
+	public Table value(String column, Object value) {
+		if (columnNames == null) {
+			columnNames = new ArrayList<>();
+			values = new ArrayList<>();
+		}
+		columnNames.add(column);
+		Metadata m = DB.getMetadata(name);
+
+		Column c = m.getColumn(column);
+		if (c == null) {
+			throw new IllegalStateException("Missing column " + column + " in table " + name);
+		}
+		values.add(c.parseObject(value));
 		return this;
 	}
 
@@ -411,10 +458,7 @@ public class Table {
 	}
 
 	public Table values(Object... values) {
-		if (this.values == null) {
-			this.values = new ArrayList<Object>();
-		}
-
+		this.values = new ArrayList<Object>();
 		Metadata m = DB.getMetadata(name);
 
 		for (int i = 0; i < values.length; i++) {
@@ -521,7 +565,7 @@ public class Table {
 		return values.get(index);
 	}
 
-	public long add() throws Exception {
+	public long add() {
 		Connection con = DB.getConnection();
 		try {
 			long genId = -1;
@@ -579,8 +623,13 @@ public class Table {
 
 			pstmt.close();
 			return genId;
+		} catch (SQLException e) {
+			throw new IllegalStateException(e.getMessage(), e);
 		} finally {
-			con.close();
+			try {
+				con.close();
+			} catch (SQLException e) {
+			}
 		}
 	}
 
@@ -613,7 +662,7 @@ public class Table {
 			for (Table t : joins) {
 				tables.add("`" + t.name + "`");
 			}
-			sb.append(StringUtils.join(tables, " JOIN "));
+			sb.append(StringUtils.join(tables, String.format(" %s ", joinType.sqlString())));
 		}
 		sb.append(" ON ");
 		{
@@ -676,7 +725,6 @@ public class Table {
 		int c = 1;
 		for (Table t : joins) {
 			c = t.whereValues(pstmt, c);
-			System.out.println(c + " " + t.where.size());
 		}
 		return pstmt;
 	}
@@ -826,6 +874,14 @@ public class Table {
 		return ret;
 	}
 
+	public JSONObject rowJSON() {
+		return Row.rowToJSON(row());
+	}
+
+	public JSONArray rowsJSON() {
+		return Row.rowsToJSON(rows());
+	}
+
 	public List<Row> rows() {
 		Connection con = DB.getConnection();
 		try {
@@ -935,7 +991,16 @@ public class Table {
 		if (c == null) {
 			throw new IllegalStateException("No column exists for " + column + " in table " + name);
 		}
-		where.add(WhereExp.operator(name, op, column, c.parseObject(value)));
+		if (c.isCandidateForNullValue(value)) {
+			if (op == WhereOp.EQUALS)
+				isNull(column);
+			else if (op == WhereOp.NOT_EQUALS)
+				isNotNull(column);
+			else
+				throw new IllegalArgumentException("Null value not supported with " + op);
+		} else {
+			where.add(WhereExp.operator(name, op, column, c.parseObject(value)));
+		}
 		return this;
 	}
 
@@ -1081,6 +1146,14 @@ public class Table {
 		return this;
 	}
 
+	public Table leftJoin(Table t) {
+		if (joins.size() != 1)
+			throw new IllegalStateException("Left Join only supported with two tables");
+		joins.add(t);
+		joinType = JoinType.LEFT;
+		return this;
+	}
+
 	public Table groupBy(String column) {
 		this.groupBy = column;
 		return this;
@@ -1118,4 +1191,229 @@ public class Table {
 		return this;
 	}
 
+	/**
+	 * Perform HTTP Get on this table.
+	 * 
+	 * path is angular path string of the form /users/:id?param1,param2,param3.
+	 * Any parameter that matches a column name is applied as a filter. Special
+	 * columns _start, _total are applied for pagination
+	 * 
+	 * param1/2/3 are compulsary params. They must match a column name.
+	 * 
+	 * @param req
+	 * @param resp
+	 * @param prefix
+	 * @return
+	 * @throws IOException
+	 */
+	public boolean doGet(HttpServletRequest req, HttpServletResponse resp, String path) throws IOException {
+		if (path == null)
+			throw new IllegalArgumentException("Null path");
+
+		String fullReqPath = req.getServletPath();
+		if (req.getPathInfo() != null)
+			fullReqPath += req.getPathInfo();
+
+		ArrayList<String> compulsaryParams = new ArrayList<>();
+		;
+		if (path.contains("?")) {
+			compulsaryParams.addAll(Arrays.asList(StringUtils.split(path.substring(path.indexOf('?') + 1), ",")));
+			path = path.substring(0, path.indexOf('?'));
+		}
+		String reqComps[] = StringUtils.split(fullReqPath, "/");
+		String pathComps[] = StringUtils.split(path, "/");
+
+		Metadata m = DB.getMetadata(name);
+		if (m == null)
+			throw new IllegalStateException("No table exists by name=" + name);
+
+		int primaryColumns = 0;
+
+		boolean dirty = false;
+		for (int i = 0; i < reqComps.length; i++) {
+			if (pathComps[i].startsWith(":")) {
+				String column = pathComps[i].substring(1);
+				if (m.isPrimaryColumn(column)) {
+					primaryColumns++;
+				}
+				boolean validColumn = false;
+				for (Table joinTable : joins) {
+					Metadata jM = DB.getMetadata(joinTable.name);
+					if (jM.containsColumn(column)) {
+						joinTable.where(column, reqComps[i]);
+						validColumn = true;
+					}
+				}
+				if (!validColumn) {
+					dirty = true;
+				}
+			} else if (!pathComps[i].equals(reqComps[i])) {
+				return false;
+			}
+		}
+
+		if (dirty) {
+			throw new IllegalStateException("Illegal path " + path);
+		}
+
+		// Apply compulsary params
+		for (String cparam : compulsaryParams) {
+			if (m.isPrimaryColumn(cparam))
+				primaryColumns++;
+			for (Table joinTable : joins) {
+				Metadata jM = DB.getMetadata(joinTable.name);
+				if (jM.containsColumn(cparam)) {
+					joinTable.where(cparam, req.getParameter(cparam));
+				}
+			}
+		}
+
+		// Parameters
+		Enumeration<String> names = req.getParameterNames();
+		while (names.hasMoreElements()) {
+			String column = names.nextElement();
+			// Compulsary params have already been taken care of
+			if (compulsaryParams.contains(column))
+				continue;
+
+			if (m.isPrimaryColumn(column)) {
+				primaryColumns++;
+			}
+
+			// System Columns.
+			if (column.equals("_start")) {
+				start(Integer.parseInt(req.getParameter(column)));
+			} else if (column.equals("_total")) {
+				limit(Integer.parseInt(req.getParameter(column)));
+			} else {
+				for (Table joinTable : joins) {
+					Metadata jM = DB.getMetadata(joinTable.name);
+					if (jM.containsColumn(column)) {
+						joinTable.where(column, req.getParameter(column));
+					}
+				}
+			}
+		}
+
+		Object ret = null;
+		if (primaryColumns >= m.primary.columns.size()) {
+			Row row = row();
+			if (row != null) {
+				ret = Row.rowToJSON(row);
+			}
+		} else {
+			List<Row> rows = rows();
+			if (rows != null) {
+				ret = Row.rowsToJSON(rows);
+			} else {
+				ret = new JSONArray();
+			}
+		}
+		if (ret != null) {
+			resp.getWriter().write(ret.toString());
+			resp.getWriter().flush();
+		} else {
+			resp.setStatus(404);
+		}
+		return true;
+
+	}
+
+	private static String getFileName(final Part part) {
+		for (String content : part.getHeader("content-disposition").split(";")) {
+			if (content.trim().startsWith("filename")) {
+				return content.substring(content.indexOf('=') + 1).trim().replace("\"", "");
+			}
+		}
+		return null;
+	}
+
+	private boolean valueFromRequest(String paramColumnName, HttpServletRequest req, String realColumnName) throws IOException, ServletException {
+		if (realColumnName == null) realColumnName = paramColumnName;
+		boolean isMultipart = ((req.getContentType() != null) && (req.getContentType().toLowerCase().indexOf("multipart/form-data") > -1));
+		if (isMultipart) {
+			Part part = req.getPart(paramColumnName);
+			if (part == null)
+				return false;
+			String fileName = getFileName(part);
+			if (fileName == null) {
+				value(realColumnName, IOUtils.toString(part.getInputStream()));
+			} else {
+				File temp = File.createTempFile("tmp", FilenameUtils.getExtension(fileName));
+				part.write(temp.getAbsolutePath());
+				value(realColumnName, temp);
+			}
+			return true;
+		} else {
+			String paramValue = req.getParameter(paramColumnName);
+			if (paramValue == null)
+				return false;
+			value(realColumnName, paramValue);
+			return true;
+		}
+	}
+	
+	private void sanityCheck() {
+		Metadata m = DB.getMetadata(name);
+		if (m == null)
+			throw new IllegalStateException("Missing table " + name);
+		for (int i = 1; i < joins.size(); i++) {
+			Table joinTable = joins.get(i);
+			Metadata joinMetadata = DB.getMetadata(joinTable.name);
+			if (joinMetadata == null) {
+				throw new IllegalStateException("Missing join table " + joinTable.name);
+			}
+		}
+	}
+
+	public void doPost(HttpServletRequest req, HttpServletResponse resp) {
+		sanityCheck();
+		try {
+			// Sanity check
+			Metadata m = DB.getMetadata(name);
+			
+			String autoColumnName = null;
+			// First add a row to the this table
+			for (String column : m.columnNames()) {
+				Column c = m.getColumn(column);
+				if (c.isAutoIncrement()) {
+					autoColumnName = c.getName();
+					continue;
+				}
+				valueFromRequest(column, req, null);
+			}
+
+			long id = add();
+
+			for (int i = 1; i < joins.size(); i++) {
+				Table joinTable = joins.get(i);
+				Metadata joinMetadata = DB.getMetadata(joinTable.name);
+				Constraint joinConstraint = Constraint.to(joinMetadata.constraints, name);
+				if (joinConstraint == null) {
+					continue;
+				}
+				
+				if (Objects.equals(joinConstraint.destColumn, autoColumnName)) {
+					joinTable.value(joinConstraint.sourceColumn, id);
+				} else {
+					joinTable.valueFromRequest(joinConstraint.sourceColumn, req, joinConstraint.destColumn);
+				}
+				boolean createJoinTableEntry = false;
+				for (Column column : joinMetadata.columns) {
+					if (column.isAutoIncrement())
+						continue;
+					if (column.name.equals(joinConstraint.sourceColumn))
+						continue;
+					if (joinTable.valueFromRequest(column.name, req, null)) {
+						createJoinTableEntry = true;
+					}
+				}
+				if (createJoinTableEntry) {
+					joinTable.add();
+				}
+			}
+		} catch (Exception e) {
+			throw new IllegalStateException(e);
+		}
+	}
 }

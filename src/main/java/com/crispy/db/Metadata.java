@@ -33,6 +33,14 @@ public class Metadata {
 		return Column.findByName(columns, name);
 	}
 
+	public boolean isPrimaryColumn(String name) {
+		return primary.columns.contains(name);
+	}
+	
+	public boolean containsColumn(String name) {
+		return Column.findByName(columns, name) != null;
+	}
+
 	public Index getIndex(String name) {
 		return Index.findByName(indexes, name);
 	}
@@ -54,8 +62,7 @@ public class Metadata {
 		o.put("name", name);
 		JSONArray columns = new JSONArray();
 		for (Column c : this.columns) {
-			columns.put(new JSONObject().put("name", c.name)
-					.put("type", c.type));
+			columns.put(new JSONObject().put("name", c.name).put("type", c.type));
 		}
 		o.put("columns", columns);
 		o.put("comment", comment);
@@ -143,8 +150,7 @@ public class Metadata {
 
 	public void setAdminColumns(String[] cols) throws Exception {
 		comment.put("admin", StringUtils.join(cols, ","));
-		Table.get("_metadata").columns("metadata").values(comment.toString())
-				.where("table", name).update();
+		Table.get("_metadata").columns("metadata").values(comment.toString()).where("table", name).update();
 	}
 
 	@Override
