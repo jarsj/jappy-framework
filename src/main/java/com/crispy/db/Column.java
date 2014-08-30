@@ -49,7 +49,7 @@ public class Column {
 		c.comment = "s3:" + bucket;
 		return c;
 	}
-
+	
 	public static Column text(String name, int length) {
 		return new Column(name, "VARCHAR(" + length + ")");
 	}

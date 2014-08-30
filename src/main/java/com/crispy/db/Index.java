@@ -28,11 +28,15 @@ public class Index {
 	}
 	private IndexType indexType;
 	CopyOnWriteArrayList<String> columns;
-
+	
 	public static Index create(String column) {
 		return new Index(column, column);
 	}
 
+	public static Index unique(String column) {
+		return Index.create("u_" + column, IndexType.UNIQUE, column);
+	}
+	
 	public static Index create(String name, IndexType index, String... column) {
 		Index i = new Index(name, column);
 		i.indexType = index;
