@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.imageio.ImageIO;
@@ -31,7 +32,6 @@ import com.crispy.log.Log;
 public class Image extends HttpServlet {
 
 	private static final Log LOG = Log.get("resource");
-	private static AtomicLong mID = new AtomicLong(System.currentTimeMillis());
 
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -92,7 +92,7 @@ public class Image extends HttpServlet {
 
 	public static String uploadFile(String uploadFolder, InputStream input, String fileName) throws FileNotFoundException, IOException {
 		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
-		long nextID = mID.incrementAndGet();
+		String nextID = UUID.randomUUID().toString().toLowerCase();
 		File folder = new File(uploadFolder);
 		folder.mkdirs();
 		File f = new File(folder, nextID + "." + ext);
@@ -103,7 +103,7 @@ public class Image extends HttpServlet {
 
 	public static String uploadS3(String s3Bucket, InputStream input, String fileName) throws FileNotFoundException, IOException {
 		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
-		long nextID = mID.incrementAndGet();
+		String nextID = UUID.randomUUID().toString().toLowerCase();
 		String s3Comps[] = s3Bucket.split("/");
 
 		String bucket = s3Comps[0];

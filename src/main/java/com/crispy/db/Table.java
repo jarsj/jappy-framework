@@ -644,6 +644,10 @@ public class Table {
 			}
 		}
 	}
+	
+	public long generatedId() {
+		return genId;
+	}
 
 	private PreparedStatement createJoinSelectstatement(Connection con, boolean count) throws SQLException {
 		StringBuilder sb = new StringBuilder();
@@ -1400,7 +1404,7 @@ public class Table {
 		}
 	}
 
-	public void doPost(HttpServletRequest req, HttpServletResponse resp) {
+	public Table doPost(HttpServletRequest req, HttpServletResponse resp) {
 		sanityCheck();
 		try {
 			// Sanity check
@@ -1453,6 +1457,8 @@ public class Table {
 					joinTable.add();
 				}
 			}
+			
+			return this;
 		} catch (Exception e) {
 			throw new IllegalStateException(e);
 		}
