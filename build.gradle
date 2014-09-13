@@ -1,8 +1,21 @@
-apply plugin: 'java'
-apply plugin: 'war'
-apply plugin: 'eclipse'
-apply plugin: 'maven-publish'
-apply plugin: 'jetty'
+/**
+*	Run "gradle clean pP publish" command twice to publish in sonatype staging repository
+*	
+*	Should have the following in user-local gradle.properties:
+*	sonatypeUsername=
+*	sonatypePassword=
+*	signing.keyId=
+*	signing.password=
+*	signing.secretKeyRingFile=
+**/
+
+['signing', 'java', 'eclipse', 'jetty', 'war', 'maven-publish'].each {
+    apply plugin: it
+}
+
+group = 'com.jappyframework'
+archivesBaseName = "jappy-framework"
+version = '1.4'
 
 repositories {
   mavenLocal()
@@ -27,29 +40,164 @@ dependencies {
   compile 'org.pojava:pojava:3.0.2'
 }
 
+war {
+	classifier 'web'
+	rootSpec.exclude("**/*.class")
+	rootSpec.exclude("**/*.jar")
+}
+
+// javadoc.jar generation
+task javadocJar (type: Jar, dependsOn: javadoc) { 
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+// sources.jar generation
 task sourceJar(type: Jar) {
+	classifier = 'sources'
     from sourceSets.main.allJava
 }
 
-publishing {
-  publications {
-    mavenJava(MavenPublication) {
-      groupId 'com.jappyframework'
-      artifactId 'jappy-framework'
-      version '1.4'
-      
-      from components.java
+// pom file name
+ext {
+    pomFilePath = "${project.projectDir}/tmp/pom.xml"
+    pomFile = file(pomFilePath)
+}
 
-      artifact sourceJar {
-	classifier "sources"
-      }
+// add configuration for pom signing
+configurations {
+    pom
+}
+
+// summarize artifacts
+artifacts {
+    archives jar
+	archives javadocJar
+    archives sourceJar
+	archives war
+    if (pomFile.exists()) {
+        pom pomFile
     }
-  }
 }
 
-
-war {
-  rootSpec.exclude("**/*.class")
-  rootSpec.exclude("**/*.jar")
+// sign all artifacts
+task signJars (type : Sign, dependsOn: [jar, javadocJar, sourceJar, war]) {
+    sign configurations.archives
 }
 
+// sign pom
+task signPom(type: Sign) {
+    sign configurations.pom
+}
+
+// defining which tasks should be called
+if (project.ext.pomFile.exists()) {
+    task preparePublication (dependsOn : [signJars, signPom])
+} else {
+    task preparePublication (dependsOn : signJars)
+}
+
+// extract signatures and add classifier and extension to them
+def getSignatureFiles = {
+    def allFiles = project.tasks.signJars.signatureFiles.collect { it }
+    def signedSources = allFiles.find { it.name.contains('-sources') }
+    def signedJavadoc = allFiles.find { it.name.contains('-javadoc') }
+	def signedWar = allFiles.find { it.name.contains('-web') }
+    def signedJar = (allFiles - [signedWar, signedSources, signedJavadoc])[0]
+    return [
+            [archive: signedSources, classifier: 'sources', extension: 'jar.asc'],
+            [archive: signedJavadoc, classifier: 'javadoc', extension: 'jar.asc'],
+            [archive: signedWar,     classifier: 'web',      extension: 'war.asc'],
+			[archive: signedJar,     classifier: null,      extension: 'jar.asc']
+    ]
+}
+
+// extract pom signature
+def getPomSignature = {
+    return project.tasks.signPom.signatureFiles.collect{it}[0]
+}
+
+publishing {
+    publications {
+        gpgJars(MavenPublication) {
+            getSignatureFiles().each {signature ->
+                artifact (signature.archive) {
+                    classifier = signature.classifier
+                    extension  = signature.extension
+                }
+            }
+        }
+        if (project.ext.pomFile.exists()) {
+            gpgPom(MavenPublication) {
+                artifact (getPomSignature()) {
+                    classifier = null
+                    extension  = 'pom.asc'
+                }
+            }
+        }
+		
+		mavenCustom(MavenPublication) {
+            from components.java
+			
+			artifact sourceJar {
+				classifier "sources"
+			}
+			
+			artifact javadocJar {
+				classifier "javadoc"
+			}
+			
+			artifact war {
+				classifier 'web'
+			}
+			
+            pom.withXml {
+                asNode().children().last() + {
+                    resolveStrategy = Closure.DELEGATE_FIRST
+                    name 'jappy-framework'
+                    packaging 'jar'
+					description 'jappy-framework'
+                    url 'https://github.com/jarsj/jappy-framework'
+                    scm {
+                        url 'scm:git@github.com:jarsj/jappy-framework.git'
+                        connection 'scm:git@github.com:jarsj/jappy-framework.git'
+                        developerConnection 'scm:git@github.com:jarsj/jappy-framework.git'
+                    }
+                    licenses {
+                        license {
+                            name 'The Apache Software License, Version 2.0'
+                            url 'http://www.apache.org/license/LICENSE-2.0.txt'
+                            distribution 'repo'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id 'jarsj'
+                            name 'Harsh Jain'
+                            email 'harsh@crispygam.es'
+                        }
+                    }
+                }
+            }
+        }
+    }
+	model {
+		tasks.generatePomFileForMavenCustomPublication {
+			destination = pomFilePath
+		}
+	}
+	
+    repositories {
+		maven {
+            if (project.ext.pomFile.exists()) {
+                url 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
+                credentials {
+                    username = sonatypeUsername
+                    password = sonatypePassword
+                }
+            } else {
+                url "file:/${project.projectDir}/tmp"
+            }
+		}
+    }
+}
