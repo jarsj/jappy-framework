@@ -15,7 +15,7 @@
 
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '1.4'
+version = '1.5'
 
 repositories {
   mavenLocal()
@@ -108,7 +108,7 @@ def getSignatureFiles = {
             [archive: signedSources, classifier: 'sources', extension: 'jar.asc'],
             [archive: signedJavadoc, classifier: 'javadoc', extension: 'jar.asc'],
             [archive: signedWar,     classifier: 'web',      extension: 'war.asc'],
-			[archive: signedJar,     classifier: null,      extension: 'jar.asc']
+            [archive: signedJar,     classifier: null,      extension: 'jar.asc']
     ]
 }
 
