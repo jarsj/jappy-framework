@@ -1,5 +1,7 @@
 /**
-*	Run "gradle clean pP publish" command twice to publish in sonatype staging repository
+*	Run "gradle clean pP publish" to publish locally
+*
+*	Run "gradle clean pP publish -Pmvncentral=true" command twice to publish in sonatype staging repository
 *	
 *	Should have the following in user-local gradle.properties:
 *	sonatypeUsername=
@@ -13,9 +15,14 @@
     apply plugin: it
 }
 
+def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
 version = '1.5'
+
+if(hasProperty("mvncentral")) {
+    isMvnCentral = mvncentral
+}
 
 repositories {
   mavenLocal()
@@ -182,22 +189,24 @@ publishing {
         }
     }
 	model {
-		tasks.generatePomFileForMavenCustomPublication {
-			destination = pomFilePath
+		if(isMvnCentral=="true") {
+			tasks.generatePomFileForMavenCustomPublication {
+				destination = pomFilePath
+			}
 		}
 	}
 	
     repositories {
-		maven {
-            if (project.ext.pomFile.exists()) {
-                url 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
-                credentials {
-                    username = sonatypeUsername
-                    password = sonatypePassword
-                }
-            } else {
-                url "file:/${project.projectDir}/tmp"
-            }
+		if (project.ext.pomFile.exists() && isMvnCentral=="true") {
+			maven {
+				url 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
+				credentials {
+					username = sonatypeUsername
+					password = sonatypePassword
+				}
+			}
+		} else {
+			mavenLocal()
 		}
-    }
+	}
 }
