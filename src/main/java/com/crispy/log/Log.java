@@ -5,7 +5,6 @@ import java.net.URLEncoder;
 import java.util.Enumeration;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Appender;
 import org.apache.log4j.AsyncAppender;
 import org.apache.log4j.ConsoleAppender;
@@ -22,16 +21,7 @@ import org.apache.log4j.RollingFileAppender;
  * 
  */
 public class Log {
-	private static String DEFAULT_DAILY_FOLDER;
-	private static boolean DEFAULT_CONSOLE;
-	private static boolean DEFAULT_ASYNC;
-	private static Level DEFAULT_LEVEL;
-	private static String DEFAULT_EMAIL_TO;
-	private static Level DEFAULT_EMAIL_LEVEL;
-	private static Level DEFAULT_DAILY_LEVEL;
-	private static String DEFAULT_SIZE_FOLDER;
-	private static Level DEFAULT_SIZE_LEVEL;
-	private static Level DEFAULT_CONSOLE_LEVEL;
+	private static String LOG_FOLDER = "/mnt/logs";
 
 	private String name;
 	private Logger logger;
@@ -43,56 +33,10 @@ public class Log {
 		this.prefix = "";
 		this.logger = Logger.getLogger(name);
 		this.async = false;
-		async(DEFAULT_ASYNC);
-		if (DEFAULT_CONSOLE) {
-			console(DEFAULT_CONSOLE_LEVEL);
-		}
-		if (DEFAULT_DAILY_FOLDER != null) {
-			daily(DEFAULT_DAILY_FOLDER, DEFAULT_DAILY_LEVEL);
-		}
-		if (DEFAULT_SIZE_FOLDER != null) {
-			size(DEFAULT_SIZE_FOLDER, 64, DEFAULT_SIZE_LEVEL);
-		}
-		if (DEFAULT_LEVEL != null) {
-			level(DEFAULT_LEVEL);
-		}
-		if (DEFAULT_EMAIL_TO != null) {
-			email(DEFAULT_EMAIL_TO, DEFAULT_EMAIL_LEVEL);
-		}
 	}
 
 	public static Log get(String name) {
 		return new Log(name);
-	}
-
-	public static void globalDaily(String folder, Level l) {
-		try {
-			FileUtils.forceMkdir(new File(folder));
-			DEFAULT_DAILY_FOLDER = folder;
-			DEFAULT_DAILY_LEVEL = l;
-		} catch (Throwable t) {
-			t.printStackTrace();
-		}
-	}
-
-	public static void globalSize(String folder, Level l) {
-		try {
-			FileUtils.forceMkdir(new File(folder));
-			DEFAULT_SIZE_FOLDER = folder;
-			DEFAULT_SIZE_LEVEL = l;
-		} catch (Throwable t) {
-			t.printStackTrace();
-		}
-	}
-
-	public static void globalConsole(Level l) {
-		DEFAULT_CONSOLE = true;
-		DEFAULT_CONSOLE_LEVEL = l;
-	}
-
-	public static void globalEmail(String to, Level l) {
-		DEFAULT_EMAIL_TO = to;
-		DEFAULT_EMAIL_LEVEL = l;
 	}
 
 	public Log async(boolean async) {
@@ -122,8 +66,8 @@ public class Log {
 		return this;
 	}
 
-	public Log daily(String folder, Level l) {
-		return daily(folder, l, "%p %d{yyyy-MM-dd HH:mm:ss}: %m%n");
+	public Log daily(Level l) {
+		return daily(l, "%p %d{yyyy-MM-dd HH:mm:ss}: %m%n");
 	}
 
 	public Log s3(Level l, String bucket, String folder, String pattern,
@@ -157,13 +101,11 @@ public class Log {
 				TimeUnit.MINUTES);
 	}
 
-	public Log daily(String folder, Level l, String pattern) {
+	public Log daily(Level l, String pattern) {
 		try {
-			FileUtils.forceMkdir(new File(folder));
-
 			DailyRollingFileAppender appender = new DailyRollingFileAppender(
 					new PatternLayout(pattern),
-					new File(folder + "/" + name).getAbsolutePath(),
+					new File(LOG_FOLDER + "/" + name).getAbsolutePath(),
 					"dd-MM-yyyy");
 			appender.setName("jappy-daily");
 			appender.setThreshold(l);
@@ -183,12 +125,11 @@ public class Log {
 		return this;
 	}
 
-	public Log size(String folder, int maxSizeInMB, Level l) {
+	public Log size(int maxSizeInMB, Level l) {
 		try {
-			FileUtils.forceMkdir(new File(folder));
 			RollingFileAppender appender = new RollingFileAppender(
 					new PatternLayout("%p %d{yyyy-MM-dd HH:mm:ss}: %m%n"),
-					new File(folder + "/" + name).getAbsolutePath());
+					new File(LOG_FOLDER + "/" + name).getAbsolutePath());
 			appender.setName("jappy-size");
 			appender.setMaxFileSize(maxSizeInMB + "MB");
 			appender.setThreshold(l);
