@@ -27,6 +27,10 @@ public class Log {
 	private Logger logger;
 	private String prefix;
 	private boolean async;
+	
+	public static void init(String folder) {
+		LOG_FOLDER = folder;
+	}
 
 	private Log(String name) {
 		this.name = name;
