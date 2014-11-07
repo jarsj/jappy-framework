@@ -47,6 +47,15 @@ dependencies {
   compile 'org.pojava:pojava:3.0.2'
 }
 
+if (JavaVersion.current().isJava8Compatible()) {
+    allprojects {
+        tasks.withType(Javadoc) {
+            // disable the crazy super-strict doclint tool in Java 8
+            options.addStringOption('Xdoclint:none', '-quiet')
+        }
+    }
+}
+
 war {
 	classifier 'web'
 	rootSpec.exclude("**/*.class")
@@ -114,7 +123,7 @@ def getSignatureFiles = {
     return [
             [archive: signedSources, classifier: 'sources', extension: 'jar.asc'],
             [archive: signedJavadoc, classifier: 'javadoc', extension: 'jar.asc'],
-            [archive: signedWar,     classifier: 'web',      extension: 'war.asc'],
+            //[archive: signedWar,     classifier: 'web',      extension: 'war.asc'],
             [archive: signedJar,     classifier: null,      extension: 'jar.asc']
     ]
 }
@@ -154,9 +163,9 @@ publishing {
 				classifier "javadoc"
 			}
 			
-			artifact war {
+			/*artifact war {
 				classifier 'web'
-			}
+			}*/
 			
             pom.withXml {
                 asNode().children().last() + {
