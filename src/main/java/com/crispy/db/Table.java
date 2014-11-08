@@ -107,7 +107,17 @@ public class Table {
 			where.values[0] = value;
 			return where;
 		}
-
+		
+		static WhereExp or(String table, String column, Object value[]) {
+			WhereExp where = new WhereExp();
+			where.exp = "(" + StringUtils.join(Collections.nCopies(value.length, table + ".`" + column + "`=?"), " OR ") + ")";
+			where.values = new Object[value.length];
+			for (int i = 0; i < value.length; i++) {
+				where.values[i] = value[i];
+			}
+			return where;
+		}
+		
 		static WhereExp in(String table, String column, Object value[]) {
 			WhereExp where = new WhereExp();
 			where.exp = table + ".`" + column + "` IN (" + StringUtils.join(Collections.nCopies(value.length, "?"), ",") + ")";
@@ -977,6 +987,20 @@ public class Table {
 		where.add(WhereExp.in(name, column, parsed));
 		return this;
 	}
+	
+	public Table or(String column, Object value[]) {
+		Metadata m = DB.getMetadata(name);
+		Column c = Column.findByName(m.columns, column);
+		if (c == null) {
+			throw new IllegalStateException("No column exists for " + column + " in table " + name);
+		}
+		Object[] parsed = new Object[value.length];
+		for (int i = 0; i < value.length; i++) {
+			parsed[i] = c.parseObject(value[i]);
+		}
+		where.add(WhereExp.or(name, column, parsed));
+		return this;
+	}
 
 	public Table search(String[] columns, String query, MatchMode mode) {
 		Metadata m = DB.getMetadata(name);
@@ -1218,7 +1242,7 @@ public class Table {
 	 * 
 	 * @param req
 	 * @param resp
-	 * @param prefix
+	 * @param path 
 	 * @return
 	 * @throws IOException
 	 */
