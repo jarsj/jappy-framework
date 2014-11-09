@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.TreeSet;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -199,6 +200,8 @@ public class Table {
 
 	private long genId;
 
+	private TreeSet<String> distincts;
+
 	public static Table get(String name) {
 		Table t = new Table(name);
 		return t;
@@ -229,7 +232,6 @@ public class Table {
 		orderBy = new String[0];
 		joins = new ArrayList<Table>();
 		where = new ArrayList<Table.WhereExp>();
-		joins.add(this);
 		comment = new JSONObject();
 		engineType = null;
 	}
@@ -242,6 +244,14 @@ public class Table {
 	public Table columns(String... name) {
 		columnNames = new ArrayList<String>();
 		columnNames.addAll(Arrays.asList(name));
+		return this;
+	}
+	
+	public Table distinct(String column) {
+		if (distincts == null) {
+			distincts = new TreeSet<String>();
+		}
+		distincts.add(column);
 		return this;
 	}
 
@@ -658,14 +668,38 @@ public class Table {
 	public long generatedId() {
 		return genId;
 	}
+	
+	private ArrayList<Table> joinTableList() {
+		ArrayList<Table> ret = new ArrayList<Table>();
+		ret.add(this);
+		for (Table t : joins) {
+			ret.addAll(t.joinTableList());
+		}
+		return ret;
+	}
 
+	/**
+	 * Create a SELECT statement for a join query.
+	 * 
+	 * @param con
+	 * @param count
+	 * @return
+	 * @throws SQLException
+	 */
 	private PreparedStatement createJoinSelectstatement(Connection con, boolean count) throws SQLException {
 		StringBuilder sb = new StringBuilder();
 		sb.append("SELECT ");
-
+		
+		if (unique) {
+			sb.append("DISTINCT ");
+		}
+		
+		// Let's first flatify the tables.
+		ArrayList<Table> flatJoins = joinTableList();
+				
 		if (!count) {
 			ArrayList<String> names = new ArrayList<String>();
-			for (Table t : joins) {
+			for (Table t : flatJoins) {
 				if (t.columnNames == null) {
 					Metadata m = DB.getMetadata(t.name);
 					for (Column column : m.columns) {
@@ -685,7 +719,7 @@ public class Table {
 		sb.append(" FROM ");
 		{
 			ArrayList<String> tables = new ArrayList<String>();
-			for (Table t : joins) {
+			for (Table t : flatJoins) {
 				tables.add("`" + t.name + "`");
 			}
 			sb.append(StringUtils.join(tables, String.format(" %s ", joinType.sqlString())));
@@ -693,23 +727,24 @@ public class Table {
 		sb.append(" ON ");
 		{
 			ArrayList<String> joinCondition = new ArrayList<String>();
-			for (int t = 0; t < joins.size() - 1; t++) {
-				Table t1 = joins.get(t);
-				Table t2 = joins.get(t + 1);
-				Metadata m1 = DB.getMetadata(t1.name);
-				Metadata m2 = DB.getMetadata(t2.name);
+			for (int t = 0; t < flatJoins.size() - 1; t++) {
+				Table t1 = flatJoins.get(t);
+				for (Table t2 : t1.joins) {
+					Metadata m1 = DB.getMetadata(t1.name);
+					Metadata m2 = DB.getMetadata(t2.name);
 
-				Constraint c = Constraint.to(m1.constraints, t2.name);
-				if (c == null)
-					c = Constraint.to(m2.constraints, t1.name);
+					Constraint c = Constraint.to(m1.constraints, t2.name);
+					if (c == null)
+						c = Constraint.to(m2.constraints, t1.name);
 
-				joinCondition.add("`" + c.sourceTable + "`.`" + c.sourceColumn + "`=`" + c.destTable + "`.`" + c.destColumn + "`");
+					joinCondition.add("`" + c.sourceTable + "`.`" + c.sourceColumn + "`=`" + c.destTable + "`.`" + c.destColumn + "`");
+				}
 			}
-			sb.append(StringUtils.join(joinCondition, ","));
+			sb.append("(" + StringUtils.join(joinCondition, " AND ") + ")");
 		}
 
 		ArrayList<String> items = new ArrayList<String>();
-		for (Table t : joins) {
+		for (Table t : flatJoins) {
 			if (t.where.size() > 0) {
 				for (WhereExp exp : t.where) {
 					items.add(exp.exp);
@@ -720,14 +755,14 @@ public class Table {
 			sb.append(" WHERE " + StringUtils.join(items, " AND "));
 		}
 
-		for (Table t : joins) {
+		for (Table t : flatJoins) {
 			if (t.groupBy != null) {
 				sb.append(" GROUP BY `" + t.name + "`." + t.groupBy);
 				break;
 			}
 		}
 
-		for (Table t : joins) {
+		for (Table t : flatJoins) {
 			if (t.orderBy.length > 0) {
 				String[] temp = new String[t.orderBy.length];
 				for (int i = 0; i < t.orderBy.length; i++) {
@@ -749,7 +784,7 @@ public class Table {
 		LOG.trace(sb.toString());
 		PreparedStatement pstmt = con.prepareStatement(sb.toString());
 		int c = 1;
-		for (Table t : joins) {
+		for (Table t : flatJoins) {
 			c = t.whereValues(pstmt, c);
 		}
 		return pstmt;
@@ -761,7 +796,7 @@ public class Table {
 	}
 
 	private PreparedStatement createSelectStatement(Connection con, boolean count) throws SQLException {
-		if (joins.size() > 1)
+		if (joins.size() > 0)
 			return createJoinSelectstatement(con, count);
 		StringBuilder sb = new StringBuilder();
 		sb.append("SELECT ");
@@ -1250,6 +1285,9 @@ public class Table {
 		if (path == null)
 			throw new IllegalArgumentException("Null path");
 
+		ArrayList<Table> nJoins = new ArrayList<Table>(joins);
+		nJoins.add(this);
+		
 		String fullReqPath = req.getServletPath();
 		if (req.getPathInfo() != null)
 			fullReqPath += req.getPathInfo();
@@ -1277,7 +1315,7 @@ public class Table {
 					primaryColumns++;
 				}
 				boolean validColumn = false;
-				for (Table joinTable : joins) {
+				for (Table joinTable : nJoins) {
 					Metadata jM = DB.getMetadata(joinTable.name);
 					if (jM.containsColumn(column)) {
 						joinTable.where(column, reqComps[i]);
@@ -1300,7 +1338,7 @@ public class Table {
 		for (String cparam : compulsaryParams) {
 			if (m.isPrimaryColumn(cparam))
 				primaryColumns++;
-			for (Table joinTable : joins) {
+			for (Table joinTable : nJoins) {
 				Metadata jM = DB.getMetadata(joinTable.name);
 				if (jM.containsColumn(cparam)) {
 					joinTable.where(cparam, req.getParameter(cparam));
@@ -1456,7 +1494,7 @@ public class Table {
 			// The row that was added
 			Row referenceRow = row();
 
-			for (int i = 1; i < joins.size(); i++) {
+			for (int i = 0; i < joins.size(); i++) {
 				Table joinTable = joins.get(i);
 				Metadata joinMetadata = DB.getMetadata(joinTable.name);
 				Constraint joinConstraint = Constraint.to(joinMetadata.constraints, name);
