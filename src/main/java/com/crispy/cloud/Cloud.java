@@ -13,6 +13,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.servlet.http.HttpServletResponse;
+
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpEntity;
@@ -47,6 +49,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.Permission;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.util.StringInputStream;
 import com.crispy.db.Column;
@@ -261,8 +264,28 @@ public class Cloud {
 			S3Object o = s3.getObject(request);
 			if (o == null)
 				return null;
-			String ret = IOUtils.toString(o.getObjectContent());
+			S3ObjectInputStream is = o.getObjectContent();
+			String ret = IOUtils.toString(is);
+			is.close();
 			return ret;
+		} catch (Throwable e) {
+			throw new IllegalArgumentException("Error downloading key = " + key, e);
+		} finally {
+			s3.shutdown();
+		}
+	}
+	
+	public void download(String key, HttpServletResponse resp) {
+		try {
+			GetObjectRequest request = new GetObjectRequest(bucket, key);
+			S3Object o = s3.getObject(request);
+			if (o == null)
+				return;
+			S3ObjectInputStream is = o.getObjectContent();
+			resp.setContentType(o.getObjectMetadata().getContentType());
+			IOUtils.copy(is, resp.getOutputStream());
+			resp.getOutputStream().flush();
+			is.close();
 		} catch (Throwable e) {
 			throw new IllegalArgumentException("Error downloading key = " + key, e);
 		} finally {
@@ -276,11 +299,12 @@ public class Cloud {
 			S3Object o = s3.getObject(request);
 			if (o == null)
 				return;
-			
+			S3ObjectInputStream is = o.getObjectContent();
 			FileOutputStream fout = new FileOutputStream(local);
-			IOUtils.copy(o.getObjectContent(), fout);
+			IOUtils.copy(is, fout);
 			fout.flush();
 			fout.close();
+			is.close();
 		} catch (Throwable e) {
 			throw new IllegalArgumentException("Error downloading key = " + key, e);
 		} finally {
