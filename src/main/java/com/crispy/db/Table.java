@@ -184,8 +184,6 @@ public class Table {
 
 	private JSONObject comment;
 
-	private String average;
-
 	private boolean ignore;
 
 	private int start;
@@ -196,7 +194,8 @@ public class Table {
 
 	private EngineType engineType;
 
-	private String max;
+	private String functionName;
+	private String functionColumn;
 
 	private long genId;
 
@@ -813,11 +812,10 @@ public class Table {
 		} else {
 			if (count) {
 				sb.append("COUNT(*)");
-			} else if (average != null) {
-				sb.append("AVG(" + average + ")");
-			} else if (max != null) {
-				sb.append("MAX(`" + max + "`)");
-			} else {
+			} else if (functionName != null) {
+				sb.append(functionName + "(" + functionColumn + ")");
+			}
+			else {
 				sb.append("*");
 			}
 		}
@@ -1080,7 +1078,8 @@ public class Table {
 	}
 
 	public double average(String column) throws SQLException {
-		average = column;
+		functionName = "AVG";
+		functionColumn = column;
 		Connection con = DB.getConnection();
 		try {
 			PreparedStatement pstmt = createSelectStatement(con, false);
@@ -1096,8 +1095,27 @@ public class Table {
 		}
 	}
 
+	public long min(String column) throws SQLException {
+		functionName = "MIN";
+		functionColumn = column;
+		Connection con = DB.getConnection();
+		try {
+			PreparedStatement pstmt = createSelectStatement(con, false);
+			ResultSet results = pstmt.executeQuery();
+			if (results.next())
+				return results.getLong(1);
+			return 0;
+		} catch (Throwable t) {
+			LOG.error(t.getMessage(), t);
+			throw new IllegalStateException(t);
+		} finally {
+			con.close();
+		}
+	}
+	
 	public long max(String column) throws SQLException {
-		max = column;
+		functionName = "MAX";
+		functionColumn = column;
 		Connection con = DB.getConnection();
 		try {
 			PreparedStatement pstmt = createSelectStatement(con, false);
