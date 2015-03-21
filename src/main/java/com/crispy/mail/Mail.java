@@ -39,12 +39,17 @@ public class Mail implements Runnable {
 
 	public Mail() {
 	}
-
+	
 	public void start(String host, String username, String password) {
+		start(host, 25, username, password);
+	}
+
+	public void start(String host, int port, String username, String password) {
 		props = new Properties();
 		props.put("mail.smtp.host", host);
 		props.put("mail.smtp.starttls.enable", "true");
 		props.put("mail.smtp.auth", "true");
+	    props.put("mail.smtp.port", port);
 
 		this.username = username;
 		this.password = password;
@@ -66,7 +71,7 @@ public class Mail implements Runnable {
 				}
 			}, from, to, subject, body);
 		} catch (Exception e) {
-			
+			e.printStackTrace();
 		}
 	}
 

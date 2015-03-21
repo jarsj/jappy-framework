@@ -18,7 +18,7 @@
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '2.1'
+version = '2.3'
 
 if(hasProperty("mvncentral")) {
     isMvnCentral = mvncentral
@@ -31,7 +31,7 @@ repositories {
 
 dependencies {
   providedCompile 'javax.servlet:javax.servlet-api:3.0.1'
-  compile 'com.amazonaws:aws-java-sdk:1.8+'
+  compile 'com.amazonaws:aws-java-sdk:1.9.16'
   compile 'commons-io:commons-io:2.4'
   compile 'commons-lang:commons-lang:2.6'
   compile 'org.apache.httpcomponents:httpclient:4.3.5'
