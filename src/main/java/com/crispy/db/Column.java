@@ -25,7 +25,7 @@ public class Column {
 	String type;
 	String def;
 	boolean autoIncrement;
-	
+
 	String comment_folder;
 	String comment_s3;
 	String[] comment_cloudfront;
@@ -52,8 +52,8 @@ public class Column {
 		c.comment_s3 = bucket;
 		return c;
 	}
-	
-	public Column cloudfront(String ... host) {
+
+	public Column cloudfront(String... host) {
 		comment_cloudfront = host;
 		return this;
 	}
@@ -128,7 +128,7 @@ public class Column {
 		c.autoIncrement = true;
 		return c;
 	}
-	
+
 	private JSONObject commentJSON() {
 		JSONObject ret = new JSONObject();
 		if (comment_folder != null) {
@@ -187,8 +187,22 @@ public class Column {
 				c.comment_cloudfront[i] = cfArray.getString(i);
 			}
 		}
-		if (type.equals("VARCHAR"))
+		if (type.equals("VARCHAR")) {
 			c.type = "VARCHAR(" + results.getInt("COLUMN_SIZE") + ")";
+		}
+
+		if (!results.getBoolean("IS_NULLABLE")) {
+			if (c.internalSimpleType() == SimpleType.TEXT) {
+				if (c.def != null && c.def.length() == 0) {
+					c.def = null;
+				}
+			} else if (c.internalSimpleType() == SimpleType.INTEGER) {
+				if (c.def != null && c.def.equals("0")) {
+					c.def = null;
+				}
+			}
+		}
+
 		if (type.equals("BIT"))
 			c.type = "BOOL";
 		return c;
@@ -340,18 +354,8 @@ public class Column {
 	public boolean isAutoIncrement() {
 		return autoIncrement;
 	}
-
-	public SimpleType simpleType(Metadata m) {
-		if (m.getConstraint(name) != null) {
-			Constraint c = m.getConstraint(name);
-			Metadata dest = DB.getMetadata(c.destTable);
-			if (dest.getDisplay() != null) {
-				return SimpleType.REFERENCE;
-			} else {
-				return SimpleType.TEXT;
-			}
-		}
-
+	
+	private SimpleType internalSimpleType() {
 		if (type.startsWith("VARCHAR")) {
 			if (comment_folder != null) {
 				return SimpleType.FILE;
@@ -377,7 +381,24 @@ public class Column {
 			return SimpleType.DATETIME;
 		if (type.equals("TIMESTAMP"))
 			return SimpleType.TIMESTAMP;
+		if (type.endsWith("INT")) 
+			return SimpleType.INTEGER;
+		
 		return SimpleType.TEXT;
+	}
+
+	public SimpleType simpleType(Metadata m) {
+		if (m.getConstraint(name) != null) {
+			Constraint c = m.getConstraint(name);
+			Metadata dest = DB.getMetadata(c.destTable);
+			if (dest.getDisplay() != null) {
+				return SimpleType.REFERENCE;
+			} else {
+				return SimpleType.TEXT;
+			}
+		}
+		
+		return internalSimpleType();
 	}
 
 	public static Column bool(String name) {
@@ -430,6 +451,11 @@ public class Column {
 		if (sValue.trim().length() != 0)
 			return false;
 		return type.equals("BIGINT") || type.equals("INT") || type.equals("FLOAT");
+	}
+
+	public boolean isDisplayAsURL() {
+		if (comment_s3 != null) return true;
+		return false;
 	}
 
 }

@@ -155,7 +155,7 @@ public class Table {
 		}
 	}
 
-	private static final Log LOG = Log.get("db");
+	private static final Log LOG = Log.get("jappy.db");
 
 	private JoinType joinType;
 	private ArrayList<Table> joins;
@@ -311,12 +311,6 @@ public class Table {
 		if (newPrimaryKey != null)
 			throw new IllegalStateException("Already got one primary key");
 		newPrimaryKey = new Index(null, name);
-		for (String n : name) {
-			Column nC = columnByName(n);
-			if (nC.def == null) {
-				nC.def = "";
-			}
-		}
 		return this;
 	}
 	

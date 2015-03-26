@@ -33,7 +33,7 @@ public class Row implements IJSONConvertible {
 	private HashMap<String, Object> columns;
 	private HashMap<String, LinkedList<String>> columnToTableIndex;
 	private TreeSet<String> tables;
-	private static final Log LOG = Log.get("db");
+	private static final Log LOG = Log.get("jappy.db");
 
 	protected Row(ResultSet results) throws SQLException {
 		columns = new HashMap<String, Object>();
@@ -275,17 +275,29 @@ public class Row implements IJSONConvertible {
 		return new JSONObject(columns);
 	}
 
-	public static JSONObject rowToJSON(Row r) throws JSONException {
+	public static JSONObject rowToJSON(Row r) throws IllegalStateException {
 		JSONObject o = new JSONObject();
-		for (Map.Entry<String, Object> entry : r.columns.entrySet()) {
-			String cname = entry.getKey();
-			cname = cname.substring(cname.indexOf('.') + 1);
-			o.put(cname, entry.getValue());
+		try {
+			for (Map.Entry<String, Object> entry : r.columns.entrySet()) {
+				String cname = entry.getKey();
+				String table = cname.substring(0, cname.indexOf('.'));
+				cname = cname.substring(cname.indexOf('.') + 1);
+
+				Metadata meta = DB.getMetadata(table);
+				Column column = meta.getColumn(cname);
+				if (column.isDisplayAsURL()) {
+					o.put(cname, r.columnAsUrl(cname));
+				} else {
+					o.put(cname, r.columnAsString(cname));
+				}
+			}
+		} catch (Exception e) {
+			throw new IllegalStateException(e);
 		}
 		return o;
 	}
 
-	public static JSONArray rowsToJSON(List<Row> rows) throws JSONException {
+	public static JSONArray rowsToJSON(List<Row> rows)  {
 		JSONArray ret = new JSONArray();
 		for (Row r : rows) {
 			ret.put(rowToJSON(r));

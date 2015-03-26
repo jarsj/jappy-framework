@@ -9,7 +9,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.DateFormat;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -28,7 +27,7 @@ public class DB {
 	private String database;
 	private ConcurrentHashMap<String, Metadata> tables;
 	private static DB INSTANCE = new DB();
-	private static Log LOG = Log.get("db");
+	private static Log LOG = Log.get("jappy.db");
 
 	public static void init(String host, String database, String user, String password) {
 		if (INSTANCE.mDS != null) {
@@ -57,7 +56,7 @@ public class DB {
 	public static void init(String database, String user, String password) {
 		init("localhost", database, user, password);
 	}
-
+	
 	public static void shutdown() {
 		if (INSTANCE.mDS != null) {
 			try {
