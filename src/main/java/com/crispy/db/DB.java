@@ -75,6 +75,13 @@ public class DB {
 		tables = new ConcurrentHashMap<String, Metadata>();
 	}
 
+	/**
+	 * Load metadata from given table into memory.
+	 * 
+	 * @param table
+	 * @return
+	 * @throws SQLException
+	 */
 	static Metadata loadMetadata(String table) throws SQLException {
 		Connection con = getConnection();
 		try {
@@ -162,7 +169,7 @@ public class DB {
 		try {
 			return INSTANCE.mDS.getConnection();
 		} catch (Throwable t) {
-			LOG.error("Couldn't retrieve connection from datastore");
+			LOG.error("Couldn't retrieve connection from datastore", t);
 			return null;
 		}
 	}

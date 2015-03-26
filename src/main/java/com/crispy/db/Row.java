@@ -1,6 +1,10 @@
 package com.crispy.db;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -13,12 +17,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.http.client.utils.URIBuilder;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.crispy.log.Log;
 import com.crispy.utils.IJSONConvertible;
+import com.crispy.utils.Utils;
 
 public class Row implements IJSONConvertible {
 	private HashMap<String, Object> columns;
@@ -90,6 +99,37 @@ public class Row implements IJSONConvertible {
 		return columnAsUrl(getTable(name), name);
 	}
 
+	public File columnAsFile(String name) {
+		return columnAsFile(getTable(name), name);
+	}
+
+	public File columnAsFile(String table, String name) {
+		Column c = DB.getMetadata(table).getColumn(name);
+		Object value = column(name);
+		if (value == null)
+			return null;
+		switch (c.simpleType(DB.getMetadata(table))) {
+		case FILE: {
+			return new File(value.toString());
+		}
+		case S3: {
+			try {
+				// Temporary hack. This needs to be optimized later.
+				URL u = columnAsUrl(table, name);
+				String fileName = StringUtils.strip(u.getPath(), "/#");
+				File temp = File.createTempFile(FilenameUtils.getBaseName(fileName), "." + FilenameUtils.getExtension(fileName));
+				InputStream is = u.openStream();
+				FileOutputStream fout = new FileOutputStream(temp);
+				IOUtils.copy(is, fout);
+				return temp;
+			} catch (Exception e) {
+				LOG.error(e.getMessage(), e);
+			}
+		}
+		}
+		return null;
+	}
+
 	public URL columnAsUrl(String table, String name) {
 		Column c = DB.getMetadata(table).getColumn(name);
 		Object value = column(name);
@@ -106,8 +146,20 @@ public class Row implements IJSONConvertible {
 		}
 		case S3: {
 			try {
-				return new URL(value.toString());
+				URL ret = null;
+				if (c.comment_cloudfront != null) {
+					URIBuilder builder = new URIBuilder(value.toString());
+					builder.setHost(c.comment_cloudfront[Utils.random(c.comment_cloudfront.length)]);
+					ret = builder.build().toURL();
+
+				} else {
+					ret = new URL(value.toString());
+				}
+				return ret;
 			} catch (MalformedURLException e) {
+				LOG.error("Malformed url table=" + table + " column=" + name);
+				return null;
+			} catch (URISyntaxException e) {
 				LOG.error("Malformed url table=" + table + " column=" + name);
 				return null;
 			}
@@ -172,7 +224,7 @@ public class Row implements IJSONConvertible {
 	public int columnAsInt(String name, int def) {
 		return columnAsInt(getTable(name), name, def);
 	}
-	
+
 	public float columnAsFloat(String name, float def) {
 		return columnAsFloat(getTable(name), name, def);
 	}
@@ -222,7 +274,7 @@ public class Row implements IJSONConvertible {
 	public JSONObject toJSONObject() {
 		return new JSONObject(columns);
 	}
-	
+
 	public static JSONObject rowToJSON(Row r) throws JSONException {
 		JSONObject o = new JSONObject();
 		for (Map.Entry<String, Object> entry : r.columns.entrySet()) {
@@ -252,7 +304,7 @@ public class Row implements IJSONConvertible {
 	public String dateAsString(String name, String format) {
 		return dateAsString(getTable(name), name, format);
 	}
-	
+
 	public void update(String column, Object value) {
 		String table = getTable(column);
 		Metadata meta = DB.getMetadata(table);
@@ -263,7 +315,7 @@ public class Row implements IJSONConvertible {
 		}
 		t.columns(column).values(value).update();
 	}
-	
+
 	public void delete() throws Exception {
 		for (String table : tables) {
 			Metadata meta = DB.getMetadata(table);

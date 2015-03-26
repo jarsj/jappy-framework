@@ -2,7 +2,6 @@ package com.crispy.db;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.net.URL;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -10,12 +9,14 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
-import java.util.Objects;
-import java.util.UUID;
 
 import org.apache.commons.lang.StringEscapeUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import com.crispy.utils.Image;
 
@@ -24,14 +25,16 @@ public class Column {
 	String type;
 	String def;
 	boolean autoIncrement;
-	String comment;
+	
+	String comment_folder;
+	String comment_s3;
+	String[] comment_cloudfront;
 
 	public Column(String name, String type) {
 		this.name = name;
 		this.type = type.toUpperCase();
 		this.def = null;
 		this.autoIncrement = false;
-		this.comment = "";
 	}
 
 	public String getType() {
@@ -40,16 +43,21 @@ public class Column {
 
 	public static Column file(String name, String folder) {
 		Column c = new Column(name, "VARCHAR(512)");
-		c.comment = "folder:" + folder;
+		c.comment_folder = folder;
 		return c;
 	}
 
 	public static Column s3(String name, String bucket) {
 		Column c = new Column(name, "VARCHAR(512)");
-		c.comment = "s3:" + bucket;
+		c.comment_s3 = bucket;
 		return c;
 	}
 	
+	public Column cloudfront(String ... host) {
+		comment_cloudfront = host;
+		return this;
+	}
+
 	public static Column text(String name, int length) {
 		return new Column(name, "VARCHAR(" + length + ")");
 	}
@@ -120,6 +128,20 @@ public class Column {
 		c.autoIncrement = true;
 		return c;
 	}
+	
+	private JSONObject commentJSON() {
+		JSONObject ret = new JSONObject();
+		if (comment_folder != null) {
+			ret.put("folder", comment_folder);
+		}
+		if (comment_s3 != null) {
+			ret.put("s3", comment_s3);
+		}
+		if (comment_cloudfront != null) {
+			ret.put("cloudfront", new JSONArray(Arrays.asList(comment_cloudfront)));
+		}
+		return ret;
+	}
 
 	public String createDefinitions() {
 		StringBuilder sb = new StringBuilder();
@@ -129,9 +151,19 @@ public class Column {
 			sb.append(" DEFAULT " + def);
 		} else if (autoIncrement)
 			sb.append(" PRIMARY KEY AUTO_INCREMENT");
-		if (comment.length() > 0)
-			sb.append(" COMMENT '" + StringEscapeUtils.escapeSql(comment) + "'");
+		JSONObject commentJSON = commentJSON();
+		if (commentJSON.length() > 0)
+			sb.append(" COMMENT '" + StringEscapeUtils.escapeSql(commentJSON.toString()) + "'");
 		return sb.toString();
+	}
+
+	private static JSONObject parseComment(String remarks) {
+		try {
+			JSONObject ret = new JSONObject(remarks);
+			return ret;
+		} catch (JSONException e) {
+			return new JSONObject();
+		}
 	}
 
 	public static Column parseResultSet(ResultSet results) throws SQLException {
@@ -140,7 +172,21 @@ public class Column {
 		Column c = new Column(columnName, type);
 		c.def = results.getString("COLUMN_DEF");
 		c.autoIncrement = results.getString("IS_AUTOINCREMENT").equals("YES");
-		c.comment = results.getString("REMARKS");
+		
+		JSONObject commentJSON = parseComment(results.getString("REMARKS"));
+		if (commentJSON.has("folder")) {
+			c.comment_folder = commentJSON.getString("folder");
+		}
+		if (commentJSON.has("s3")) {
+			c.comment_s3 = commentJSON.getString("s3");
+		}
+		if (commentJSON.has("cloudfront")) {
+			JSONArray cfArray = commentJSON.getJSONArray("cloudfront");
+			c.comment_cloudfront = new String[cfArray.length()];
+			for (int i = 0; i < cfArray.length(); i++) {
+				c.comment_cloudfront[i] = cfArray.getString(i);
+			}
+		}
 		if (type.equals("VARCHAR"))
 			c.type = "VARCHAR(" + results.getInt("COLUMN_SIZE") + ")";
 		if (type.equals("BIT"))
@@ -153,7 +199,7 @@ public class Column {
 		if (!(o instanceof Column))
 			return false;
 		Column other = (Column) o;
-		return Objects.equals(name, other.name) && Objects.equals(type, other.type) && Objects.equals(comment, other.comment);
+		return createDefinitions().equals(other.createDefinitions());
 	}
 
 	public static Column findByName(Collection<Column> columns, String name) {
@@ -168,44 +214,43 @@ public class Column {
 		if (value == null)
 			return null;
 		if (type.endsWith("TEXT") || type.startsWith("VARCHAR")) {
-			if (comment.length() > 0) {
-				if (comment.startsWith("folder:")) {
-					String uploadFolder = comment.substring(comment.indexOf(':') + 1);
-					if (value instanceof File) {
-						try {
-							return Image.uploadFile(uploadFolder, new FileInputStream((File) value), ((File) value).getName());
-						} catch (Exception e) {
-							return null;
-						}
-					} else if (value instanceof URL) {
-						try {
-							return Image.uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value).getPath());
-						} catch (Exception e) {
-							return null;
-						}
-					} else {
-						return value.toString();
+			if (comment_folder != null) {
+				String uploadFolder = comment_folder;
+				if (value instanceof File) {
+					try {
+						return Image.uploadFile(uploadFolder, new FileInputStream((File) value), ((File) value).getName());
+					} catch (Exception e) {
+						return null;
+					}
+				} else if (value instanceof URL) {
+					try {
+						return Image.uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value).getPath());
+					} catch (Exception e) {
+						return null;
 					}
 				} else {
-					String s3Bucket = comment.substring(comment.indexOf(':') + 1);
-					if (value instanceof File) {
-						try {
-							return Image.uploadS3(s3Bucket, new FileInputStream((File) value), ((File) value).getName());
-						} catch (Exception e) {
-							throw new IllegalStateException("Can not upload " + value, e);
-						}
-					} else if (value instanceof URL) {
-						try {
-							return Image.uploadS3(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath());
-						} catch (Exception e) {
-							throw new IllegalStateException("Can not upload " + value.toString(), e);
-						}
-					} else {
-						return value.toString();
-					}
+					return value.toString();
 				}
-			} else
+			} else if (comment_s3 != null) {
+				String s3Bucket = comment_s3;
+				if (value instanceof File) {
+					try {
+						return Image.uploadS3(s3Bucket, new FileInputStream((File) value), ((File) value).getName());
+					} catch (Exception e) {
+						throw new IllegalStateException("Can not upload " + value, e);
+					}
+				} else if (value instanceof URL) {
+					try {
+						return Image.uploadS3(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath());
+					} catch (Exception e) {
+						throw new IllegalStateException("Can not upload " + value.toString(), e);
+					}
+				} else {
+					return value.toString();
+				}
+			} else {
 				return value.toString();
+			}
 		}
 		if (type.equals("BIGINT")) {
 			if (value.toString().trim().length() == 0)
@@ -288,10 +333,6 @@ public class Column {
 		return value;
 	}
 
-	public String getComment() {
-		return comment;
-	}
-
 	public String getName() {
 		return name;
 	}
@@ -311,20 +352,19 @@ public class Column {
 			}
 		}
 
-		if (type.startsWith("VARCHAR") && comment.length() > 0) {
-			if (comment.startsWith("folder:")) {
-				return SimpleType.FILE;
-			} else {
-				return SimpleType.S3;
-			}
-		}
 		if (type.startsWith("VARCHAR")) {
-			String temp = type.substring(type.indexOf('(') + 1, type.indexOf(')'));
-			int length = Integer.parseInt(temp);
-			if (length < 200) {
-				return SimpleType.TEXT;
+			if (comment_folder != null) {
+				return SimpleType.FILE;
+			} else if (comment_s3 != null) {
+				return SimpleType.S3;
 			} else {
-				return SimpleType.LONGTEXT;
+				String temp = type.substring(type.indexOf('(') + 1, type.indexOf(')'));
+				int length = Integer.parseInt(temp);
+				if (length < 200) {
+					return SimpleType.TEXT;
+				} else {
+					return SimpleType.LONGTEXT;
+				}
 			}
 		}
 		if (type.endsWith("TEXT"))
@@ -382,10 +422,13 @@ public class Column {
 	}
 
 	public boolean isCandidateForNullValue(Object value) {
-		if (value == null) return true;
-		if (!(value instanceof String)) return false;
+		if (value == null)
+			return true;
+		if (!(value instanceof String))
+			return false;
 		String sValue = (String) value;
-		if (sValue.trim().length() != 0) return false;
+		if (sValue.trim().length() != 0)
+			return false;
 		return type.equals("BIGINT") || type.equals("INT") || type.equals("FLOAT");
 	}
 

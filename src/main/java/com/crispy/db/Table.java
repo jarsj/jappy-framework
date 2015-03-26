@@ -311,7 +311,20 @@ public class Table {
 		if (newPrimaryKey != null)
 			throw new IllegalStateException("Already got one primary key");
 		newPrimaryKey = new Index(null, name);
+		for (String n : name) {
+			Column nC = columnByName(n);
+			if (nC.def == null) {
+				nC.def = "";
+			}
+		}
 		return this;
+	}
+	
+	public Column columnByName(String name) {
+		for (Column c : newColumns) {
+			if (c.name.equals(name)) return c;
+		}
+		return null;
 	}
 
 	public void create() {
@@ -1441,7 +1454,7 @@ public class Table {
 				else
 					value(realColumnName, IOUtils.toString(part.getInputStream()));
 			} else {
-				File temp = File.createTempFile("tmp", FilenameUtils.getExtension(fileName));
+				File temp = File.createTempFile("tmp", "." + FilenameUtils.getExtension(fileName));
 				part.write(temp.getAbsolutePath());
 				if (where)
 					where(realColumnName, temp);

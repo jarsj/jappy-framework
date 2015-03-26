@@ -119,7 +119,9 @@ public class Image extends HttpServlet {
 	public static File scale(File source, int width, int height) throws IOException {
 		BufferedImage image = ImageIO.read(source);
 		String extension = source.getName().substring(source.getName().lastIndexOf(".") + 1);
-		return internalScale(image, extension, width, height);
+		File ret = internalScale(image, extension, width, height);
+		image.flush();
+		return ret;
 	}
 
 	public static File scale(File source, int size) throws IOException {
@@ -131,6 +133,7 @@ public class Image extends HttpServlet {
 		BufferedImage scaled = Scalr.resize(image, Method.ULTRA_QUALITY, Mode.FIT_EXACT, width, height);
 		File tempFile = File.createTempFile("tempScaled_", "." + extension);
 		ImageIO.write(scaled, extension, tempFile);
+		scaled.flush();
 		return tempFile;
 	}
 

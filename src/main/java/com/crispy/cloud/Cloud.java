@@ -3,12 +3,13 @@ package com.crispy.cloud;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +37,6 @@ import com.amazonaws.services.ec2.model.InstanceType;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.RunInstancesResult;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
-import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.Bucket;
@@ -52,13 +52,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.util.StringInputStream;
-import com.crispy.db.Column;
-import com.crispy.db.DB;
-import com.crispy.db.Metadata;
-import com.crispy.db.Row;
-import com.crispy.db.Table;
 import com.crispy.log.Log;
-import com.crispy.net.Cache;
 import com.crispy.net.Net;
 
 /**
@@ -79,11 +73,13 @@ public class Cloud {
 	public static boolean connected;
 	private static AWSCredentials credentials;
 
-	public static void init(String accessKey, String secretKey) {
-		credentials = new BasicAWSCredentials(accessKey, secretKey);
+	public static void init(String credentialsFile) throws Exception {
+		Properties props = new Properties();
+		props.load(new FileReader(credentialsFile));
+		credentials = new BasicAWSCredentials(props.getProperty("accessKey"), 
+				props.getProperty("secretKey"));
 		connected = false;
 		System.setProperty("com.amazonaws.sdk.disableCertChecking", "true");
-		// TODO : Probably don't want to do this.
 		reloadBuckets();
 	}
 
