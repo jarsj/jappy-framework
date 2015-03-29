@@ -282,7 +282,7 @@ public class Row implements IJSONConvertible {
 				String cname = entry.getKey();
 				String table = cname.substring(0, cname.indexOf('.'));
 				cname = cname.substring(cname.indexOf('.') + 1);
-
+				
 				Metadata meta = DB.getMetadata(table);
 				Column column = meta.getColumn(cname);
 				if (column.isDisplayAsURL()) {
