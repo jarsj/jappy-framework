@@ -286,9 +286,9 @@ public class Row implements IJSONConvertible {
 				Metadata meta = DB.getMetadata(table);
 				Column column = meta.getColumn(cname);
 				if (column.isDisplayAsURL()) {
-					o.put(cname, r.columnAsUrl(cname));
+					o.put(cname, r.columnAsUrl(table, cname));
 				} else {
-					o.put(cname, r.columnAsString(cname));
+					o.put(cname, r.columnAsString(table, cname));
 				}
 			}
 		} catch (Exception e) {

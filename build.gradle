@@ -18,7 +18,7 @@
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '2.5'
+version = '2.52'
 
 if(hasProperty("mvncentral")) {
     isMvnCentral = mvncentral
