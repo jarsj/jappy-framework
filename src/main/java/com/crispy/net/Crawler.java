@@ -55,7 +55,7 @@ public class Crawler extends HttpServlet {
 		LOG = Log.get("crawler");
 		handlers = new ConcurrentHashMap<String, CrawlHandler>();
 	}
-
+	
 	public void setHandler(String tag, CrawlHandler handler) {
 		handlers.put(tag, handler);
 	}
@@ -304,7 +304,7 @@ public class Crawler extends HttpServlet {
 		if (httpClient != null)
 			httpClient.getConnectionManager().shutdown();
 	}
-
+	
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 	}

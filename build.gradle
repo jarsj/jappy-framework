@@ -18,7 +18,7 @@
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '2.5'
+version = '3.24'
 
 if(hasProperty("mvncentral")) {
     isMvnCentral = mvncentral
@@ -36,15 +36,14 @@ dependencies {
   compile 'commons-lang:commons-lang:2.6'
   compile 'org.apache.httpcomponents:httpclient:4.3.5'
   compile 'commons-dbcp:commons-dbcp:1.4'
-  compile 'log4j:log4j:1.2.17'
+  compile 'ch.qos.logback:logback-classic:1.1.2'
   compile 'mysql:mysql-connector-java:5.1.32'
   compile 'org.json:json:20140107'
-  compile 'org.freemarker:freemarker:2.3.20'
-  compile 'com.sun.mail:javax.mail:1.5.2'
-  compile 'net.sourceforge.htmlcleaner:htmlcleaner:2.8'
   compile 'org.imgscalr:imgscalr-lib:4.2'
   compile 'com.ibm.icu:icu4j:53.1'
   compile 'org.pojava:pojava:3.0.2'
+  compile 'javax.mail:javax.mail-api:1.5.2'
+  compile 'com.sun.mail:javax.mail:1.5.2'
 }
 
 if (JavaVersion.current().isJava8Compatible()) {

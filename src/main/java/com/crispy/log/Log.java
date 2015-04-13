@@ -1,18 +1,23 @@
 package com.crispy.log;
 
-import java.io.File;
 import java.net.URLEncoder;
-import java.util.Enumeration;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.log4j.Appender;
-import org.apache.log4j.AsyncAppender;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.DailyRollingFileAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.RollingFileAppender;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.filter.LevelFilter;
+import ch.qos.logback.classic.filter.ThresholdFilter;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.ConsoleAppender;
+import ch.qos.logback.core.FileAppender;
+import ch.qos.logback.core.OutputStreamAppender;
+import ch.qos.logback.core.rolling.RollingFileAppender;
+import ch.qos.logback.core.rolling.S3TimeBasedRollingPolicy;
+import ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP;
+import ch.qos.logback.core.rolling.TimeBasedRollingPolicy;
+import ch.qos.logback.core.spi.FilterReply;
 
 /**
  * Logging Library. Captures the most common usecases of logging.
@@ -21,213 +26,184 @@ import org.apache.log4j.RollingFileAppender;
  * 
  */
 public class Log {
-	private static String LOG_FOLDER = "/mnt/logs";
-
-	private String name;
 	private Logger logger;
-	private String prefix;
-	private boolean async;
-	
-	public static void init(String folder) {
-		LOG_FOLDER = folder;
-	}
 
 	private Log(String name) {
-		this.name = name;
-		this.prefix = "";
-		this.logger = Logger.getLogger(name);
-		this.async = false;
+		LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
+		this.logger = context.getLogger(name);
+		this.logger.setAdditive(false);
 	}
 
 	public static Log get(String name) {
 		return new Log(name);
 	}
 
-	public Log async(boolean async) {
-		if (this.async == async)
-			return this;
-		this.async = async;
-		if (this.async) {
-			AsyncAppender asyncAppender = new AsyncAppender();
-			asyncAppender.setName(name + "-async-appender");
-			Enumeration appenders = logger.getAllAppenders();
-			while (appenders.hasMoreElements()) {
-				Appender a = (Appender) appenders.nextElement();
-				asyncAppender.addAppender(a);
-			}
-			logger.removeAllAppenders();
-			logger.addAppender(asyncAppender);
-		} else {
-			AsyncAppender asyncAppender = (AsyncAppender) logger
-					.getAppender(name + "-async-appender");
-			logger.removeAllAppenders();
-			Enumeration appenders = asyncAppender.getAllAppenders();
-			while (appenders.hasMoreElements()) {
-				Appender a = (Appender) appenders.nextElement();
-				logger.addAppender(a);
-			}
-		}
-		return this;
-	}
+	public Log appender(Appender appender) {
+		PatternLayoutEncoder encoder = new PatternLayoutEncoder();
+		encoder.setContext(logger.getLoggerContext());
+		encoder.setPattern(appender.pattern);
+		encoder.start();
 
-	public Log daily(Level l) {
-		return daily(l, "%p %d{yyyy-MM-dd HH:mm:ss}: %m%n");
-	}
+		
+		
 
-	public Log s3(Level l, String bucket, String folder, String pattern,
-			String maxSize, long duration, TimeUnit period) {
-		try {
-			S3Appender appender = new S3Appender(new PatternLayout(pattern),
-					new File("/mnt/tmp"), bucket, folder);
-			appender.setName("jappy-s3");
-			appender.setMaxFileSize(maxSize);
-			appender.setThreshold(l);
-			appender.setRolloverTime(duration, period);
+		OutputStreamAppender<ILoggingEvent> ret = null;
 
-			if (!async) {
-				logger.removeAppender("jappy-s3");
-				logger.addAppender(appender);
+		if (appender.console) {
+			ret = new ConsoleAppender<ILoggingEvent>();
+			ret.setContext(logger.getLoggerContext());
+		} else if (appender.s3bucket != null || appender.folder != null) {
+			ret = new RollingFileAppender<ILoggingEvent>();
+			ret.setContext(logger.getLoggerContext());
+
+			TimeBasedRollingPolicy<ILoggingEvent> policy = null;
+			if (appender.s3bucket != null) {
+				policy = new S3TimeBasedRollingPolicy<ILoggingEvent>();
+				((S3TimeBasedRollingPolicy<ILoggingEvent>) policy).setS3BucketName(appender.s3bucket);
+				((S3TimeBasedRollingPolicy<ILoggingEvent>) policy).setS3FolderName(appender.s3folder + "/" + logger.getName());
+				((S3TimeBasedRollingPolicy<ILoggingEvent>) policy).setRollingOnExit(true);
 			} else {
-				AsyncAppender aa = (AsyncAppender) logger.getAppender(name
-						+ "-async-appender");
-				aa.removeAppender("jappy-s3");
-				aa.addAppender(appender);
+				policy = new TimeBasedRollingPolicy<ILoggingEvent>();
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return this;
-	}
 
-	public Log s3(Level l, String bucket, String folder, String pattern,
-			String maxSize) {
-		return s3(l, bucket, folder, pattern, maxSize, Long.MAX_VALUE,
-				TimeUnit.MINUTES);
-	}
+			if (appender.folder == null) {
+				appender.folder = "/tmp";
+			}
 
-	public Log daily(Level l, String pattern) {
-		try {
-			DailyRollingFileAppender appender = new DailyRollingFileAppender(
-					new PatternLayout(pattern),
-					new File(LOG_FOLDER + "/" + name).getAbsolutePath(),
-					"dd-MM-yyyy");
-			appender.setName("jappy-daily");
-			appender.setThreshold(l);
-
-			if (!async) {
-				logger.removeAppender("jappy-daily");
-				logger.addAppender(appender);
+			policy.setParent((FileAppender) ret);
+			policy.setContext(logger.getLoggerContext());
+			if (appender.size != null) {
+				policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd}.%i.log");
 			} else {
-				AsyncAppender aa = (AsyncAppender) logger.getAppender(name
-						+ "-async-appender");
-				aa.removeAppender("jappy-daily");
-				aa.addAppender(appender);
+				policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd}.log");
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return this;
-	}
 
-	public Log size(int maxSizeInMB, Level l) {
-		try {
-			RollingFileAppender appender = new RollingFileAppender(
-					new PatternLayout("%p %d{yyyy-MM-dd HH:mm:ss}: %m%n"),
-					new File(LOG_FOLDER + "/" + name).getAbsolutePath());
-			appender.setName("jappy-size");
-			appender.setMaxFileSize(maxSizeInMB + "MB");
-			appender.setThreshold(l);
-			appender.setMaxBackupIndex(100);
+			policy.start();
 
-			if (!async) {
-				logger.removeAppender("jappy-size");
-				logger.addAppender(appender);
-			} else {
-				AsyncAppender aa = (AsyncAppender) logger.getAppender(name
-						+ "-async-appender");
-				aa.removeAppender("jappy-size");
-				aa.addAppender(appender);
+			if (appender.size != null) {
+				SizeAndTimeBasedFNATP<ILoggingEvent> satb = new SizeAndTimeBasedFNATP<ILoggingEvent>();
+				satb.setMaxFileSize(appender.size);
+				satb.setContext(logger.getLoggerContext());
+				satb.setTimeBasedRollingPolicy(policy);
+				satb.start();
+
+				policy.setTimeBasedFileNamingAndTriggeringPolicy(satb);
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
+
+			((RollingFileAppender<ILoggingEvent>) ret).setRollingPolicy(policy);
 		}
-		return this;
-	}
 
-	public Log level(Level l) {
-		logger.setLevel(l);
-		return this;
-	}
-
-	public Log console(Level l) {
-		ConsoleAppender console = new ConsoleAppender();
-		console.setName("jappy-console");
-		console.setLayout(new PatternLayout("%p %d{yyyy-MM-dd HH:mm:ss} %m%n"));
-		console.setThreshold(l);
-		console.activateOptions();
-
-		if (!async) {
-			logger.removeAppender("jappy-console");
-			logger.addAppender(console);
-		} else {
-			AsyncAppender aa = (AsyncAppender) logger.getAppender(name
-					+ "-async-appender");
-			aa.removeAppender("jappy-console");
-			aa.addAppender(console);
+		if (appender.level != null) {
+			ThresholdFilter lf = new ThresholdFilter();
+			lf.setLevel(appender.level.toString());
+			lf.setContext(logger.getLoggerContext());
+			lf.start();
+			ret.addFilter(lf);
 		}
+		
+		ret.setEncoder(encoder);
+		ret.start();
+
+		logger.addAppender(ret);
 		return this;
 	}
 
-	public Log email(String to, Level l) {
-
-		EC2SMTPAppender email = new EC2SMTPAppender(to, l);
-		email.setName("jappy-email");
-		email.setThreshold(l);
-		email.activateOptions();
-
-		if (!async) {
-			logger.removeAppender("jappy-email");
-			logger.addAppender(email);
-		} else {
-			AsyncAppender aa = (AsyncAppender) logger.getAppender(name
-					+ "-async-appender");
-			aa.removeAppender("jappy-email");
-			aa.addAppender(email);
-		}
-		return this;
-	}
-
-	public Log prefix(String p) {
-		this.prefix = p;
-		this.prefix += " ";
-		return this;
-	}
+	/*
+	 * public Log mail(String host, int port, String username, String password,
+	 * boolean tls) { SMTPAppender appender = new SMTPAppender();
+	 * appender.setContext(logger.getLoggerContext());
+	 * appender.setSMTPHost(host); appender.setSmtpPort(port);
+	 * appender.setUsername(username); appender.setPassword(password);
+	 * CyclicBufferTracker<ILoggingEvent> cbTracker = new
+	 * CyclicBufferTracker<ILoggingEvent>(); cbTracker.setBufferSize(10);
+	 * appender.setCyclicBufferTracker(cbTracker);
+	 * appender.setFrom("harsh@redhotcasino.in");
+	 * appender.addTo("harsh@crispygam.es");
+	 * 
+	 * appender.setSTARTTLS(tls);
+	 * 
+	 * PatternLayout layout = new PatternLayout();
+	 * layout.setContext(logger.getLoggerContext()); if (pattern != null) {
+	 * layout.setPattern(pattern); } else { layout.setPattern(
+	 * "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"); }
+	 * 
+	 * layout.start(); appender.setLayout(layout);
+	 * 
+	 * MDCBasedDiscriminator discriminator = new MDCBasedDiscriminator();
+	 * discriminator.setContext(logger.getLoggerContext());
+	 * discriminator.setKey("req.remoteHost"); discriminator.start();
+	 * appender.setDiscriminator(discriminator);
+	 * 
+	 * appender.start();
+	 * 
+	 * logger.addAppender(appender); return this; }
+	 */
 
 	public void info(String message) {
-		logger.info(prefix + message);
+		logger.info(message);
+	}
+
+	public void info(String format, Object message1, Object message2) {
+		logger.info(format, message1, message2);
+	}
+
+	public void info(String format, Object message) {
+		logger.info(format, message);
 	}
 
 	public void error(String message) {
-		logger.error(prefix + message);
+		logger.error(message);
+	}
+
+	public void error(String format, Object message) {
+		logger.error(format, message);
+	}
+
+	public void error(String format, Object message1, Object message2) {
+		logger.error(format, message1, message2);
 	}
 
 	public void error(String message, Throwable t) {
-		logger.error(prefix + message, t);
+		logger.error(message, t);
 	}
 
 	public void trace(String message) {
-		logger.trace(prefix + message);
+		logger.trace(message);
 	}
 
 	public void warn(String message) {
-		logger.warn(prefix + message);
+		logger.warn(message);
+	}
+	
+	public void warn(String format, Object message) {
+		logger.warn(format, message);
+	}
+	
+	public void warn(String format, Object message1, Object message2) {
+		logger.warn(format, message1, message2);
 	}
 
 	public void debug(String message) {
 		logger.debug(message);
 	}
 
+	public void debug(String format, Object message) {
+		logger.debug(format, message);
+	}
+
+	public void debug(String format, Object message1, Object message2) {
+		logger.debug(format, message1, message2);
+	}
+
 	public static String safe(String m) {
 		return URLEncoder.encode(m);
+	}
+
+	public void trace(String format, Object message) {
+		logger.trace(format, message);
+	}
+
+	public void trace(String format, Object message1, Object message2) {
+		logger.trace(format, message1, message2);
 	}
 }

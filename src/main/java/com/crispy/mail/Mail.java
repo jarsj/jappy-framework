@@ -22,8 +22,6 @@ import javax.mail.internet.MimeMessage;
 
 import org.json.JSONObject;
 
-import com.crispy.log.Log;
-
 /**
  * Mail component.
  * 
@@ -36,7 +34,7 @@ public class Mail implements Runnable {
 	private String password;
 	private ScheduledExecutorService background;
 	private ConcurrentHashMap<String, LinkedBlockingQueue<String>> queue;
-
+	
 	public Mail() {
 	}
 	
