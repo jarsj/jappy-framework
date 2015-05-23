@@ -4,6 +4,7 @@ import java.net.URLEncoder;
 
 import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
@@ -32,6 +33,7 @@ public class Log {
 		LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
 		this.logger = context.getLogger(name);
 		this.logger.setAdditive(false);
+		this.logger.setLevel(Level.ALL);
 	}
 
 	public static Log get(String name) {
@@ -43,9 +45,6 @@ public class Log {
 		encoder.setContext(logger.getLoggerContext());
 		encoder.setPattern(appender.pattern);
 		encoder.start();
-
-		
-		
 
 		OutputStreamAppender<ILoggingEvent> ret = null;
 

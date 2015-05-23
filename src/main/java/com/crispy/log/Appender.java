@@ -24,7 +24,7 @@ public class Appender {
 	private Appender() {
 		console = false;
 		daily = false;
-		pattern = "%-12date{YYYY-MM-dd HH:mm:ss.SSS} %-5level - %msg%n";
+		pattern = "%c{2} %-12date{YYYY-MM-dd HH:mm:ss.SSS} %-5level - %msg%n";
 	}
 	
 	public static Appender create() {
@@ -53,6 +53,13 @@ public class Appender {
 	
 	public Appender level(Level level) {
 		this.level = level;
+		return this;
+	}
+	
+	public Appender level(String property, Level defLevel) {
+		String level = System.getProperty(property, defLevel.toString());
+		System.out.println("Setting level to property=" + property + " value=" + System.getProperty(property) + " default=" + defLevel);
+		this.level = Level.toLevel(level);
 		return this;
 	}
 	

@@ -16,6 +16,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
@@ -65,8 +66,8 @@ public class Row implements IJSONConvertible {
 		LinkedList<String> tables = columnToTableIndex.get(name);
 		if (tables == null)
 			throw new IllegalArgumentException("Column does not exist " + name);
-		if (tables.size() > 1)
-			throw new IllegalArgumentException("Multiple tables exist for column " + name);
+		//if (tables.size() > 1)
+			//throw new IllegalArgumentException("Multiple tables exist for column " + name);
 		return tables.getFirst();
 	}
 
@@ -297,10 +298,10 @@ public class Row implements IJSONConvertible {
 		return o;
 	}
 
-	public static JSONArray rowsToJSON(List<Row> rows)  {
+	public static JSONArray rowsToJSON(List<Row> rows, RowTransform transform)  {
 		JSONArray ret = new JSONArray();
 		for (Row r : rows) {
-			ret.put(rowToJSON(r));
+			ret.put(transform.transform(rowToJSON(r)));
 		}
 		return ret;
 	}

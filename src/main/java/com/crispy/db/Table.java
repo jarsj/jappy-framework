@@ -174,6 +174,7 @@ public class Table {
 	private ArrayList<UpdateExp> increments;
 	private Index newPrimaryKey;
 	private Row copy;
+	private RowTransform transform;
 
 	private ArrayList<Object> values;
 	private boolean deleteOldColumns;
@@ -210,6 +211,11 @@ public class Table {
 		this.engineType = type;
 		return this;
 	}
+	
+	public Table transform(RowTransform transform) {
+		this.transform = transform;
+		return this;
+	}
 
 	public Table overwrite(String... column) {
 		if (this.overwriteColumns == null)
@@ -233,6 +239,13 @@ public class Table {
 		where = new ArrayList<Table.WhereExp>();
 		comment = new JSONObject();
 		engineType = null;
+		transform = new RowTransform() {
+			
+			@Override
+			public JSONObject transform(JSONObject o) {
+				return o;
+			}
+		};
 	}
 
 	public Table deleteOldColumns() {
@@ -941,11 +954,11 @@ public class Table {
 	}
 
 	public JSONObject rowJSON() {
-		return Row.rowToJSON(row());
+		return transform.transform(Row.rowToJSON(row()));
 	}
 
 	public JSONArray rowsJSON() {
-		return Row.rowsToJSON(rows());
+		return Row.rowsToJSON(rows(), transform);
 	}
 
 	public List<Row> rows() {
@@ -1402,12 +1415,12 @@ public class Table {
 		if (primaryColumns >= m.primary.columns.size()) {
 			Row row = row();
 			if (row != null) {
-				ret = Row.rowToJSON(row);
+				ret = transform.transform(Row.rowToJSON(row));
 			}
 		} else {
 			List<Row> rows = rows();
 			if (rows != null) {
-				ret = Row.rowsToJSON(rows);
+				ret = Row.rowsToJSON(rows, transform);
 			} else {
 				ret = new JSONArray();
 			}
@@ -1419,7 +1432,6 @@ public class Table {
 			resp.setStatus(404);
 		}
 		return true;
-
 	}
 
 	private static String getFileName(final Part part) {

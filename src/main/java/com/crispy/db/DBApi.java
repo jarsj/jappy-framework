@@ -55,7 +55,12 @@ public class DBApi extends HttpServlet {
 			}
 
 			if (isArray) {
-				JSONArray ret = Row.rowsToJSON(t.rows());
+				JSONArray ret = Row.rowsToJSON(t.rows(), new RowTransform() {
+					@Override
+					public JSONObject transform(JSONObject o) {
+						return o;
+					}
+				});
 				resp.getWriter().write(ret.toString());
 				resp.getWriter().flush();
 			} else {

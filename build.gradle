@@ -11,14 +11,14 @@
 *	signing.secretKeyRingFile=
 **/
 
-['signing', 'java', 'eclipse', 'jetty', 'war', 'maven-publish'].each {
+['signing', 'java', 'eclipse', 'jetty', 'maven-publish'].each {
     apply plugin: it
 }
 
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '3.24'
+version = '3.34'
 
 if(hasProperty("mvncentral")) {
     isMvnCentral = mvncentral
@@ -30,7 +30,6 @@ repositories {
 }
 
 dependencies {
-  providedCompile 'javax.servlet:javax.servlet-api:3.0.1'
   compile 'com.amazonaws:aws-java-sdk:1.9.16'
   compile 'commons-io:commons-io:2.4'
   compile 'commons-lang:commons-lang:2.6'
@@ -44,6 +43,10 @@ dependencies {
   compile 'org.pojava:pojava:3.0.2'
   compile 'javax.mail:javax.mail-api:1.5.2'
   compile 'com.sun.mail:javax.mail:1.5.2'
+  compile 'org.apache.tomcat.embed:tomcat-embed-logging-juli:8.0.21'
+  compile 'org.apache.tomcat.embed:tomcat-embed-logging-log4j:8.0.21'
+  compile 'org.apache.tomcat.embed:tomcat-embed-websocket:8.0.21'
+  compile 'org.apache.tomcat.embed:tomcat-embed-core:8.0.21'
 }
 
 if (JavaVersion.current().isJava8Compatible()) {
@@ -53,12 +56,6 @@ if (JavaVersion.current().isJava8Compatible()) {
             options.addStringOption('Xdoclint:none', '-quiet')
         }
     }
-}
-
-war {
-	classifier 'web'
-	rootSpec.exclude("**/*.class")
-	rootSpec.exclude("**/*.jar")
 }
 
 // javadoc.jar generation
@@ -87,16 +84,15 @@ configurations {
 // summarize artifacts
 artifacts {
     archives jar
-	archives javadocJar
+    archives javadocJar
     archives sourceJar
-	archives war
     if (pomFile.exists()) {
         pom pomFile
     }
 }
 
 // sign all artifacts
-task signJars (type : Sign, dependsOn: [jar, javadocJar, sourceJar, war]) {
+task signJars (type : Sign, dependsOn: [jar, javadocJar, sourceJar]) {
     sign configurations.archives
 }
 
@@ -117,12 +113,10 @@ def getSignatureFiles = {
     def allFiles = project.tasks.signJars.signatureFiles.collect { it }
     def signedSources = allFiles.find { it.name.contains('-sources') }
     def signedJavadoc = allFiles.find { it.name.contains('-javadoc') }
-	def signedWar = allFiles.find { it.name.contains('-web') }
-    def signedJar = (allFiles - [signedWar, signedSources, signedJavadoc])[0]
+    def signedJar = (allFiles - [signedSources, signedJavadoc])[0]
     return [
             [archive: signedSources, classifier: 'sources', extension: 'jar.asc'],
             [archive: signedJavadoc, classifier: 'javadoc', extension: 'jar.asc'],
-            //[archive: signedWar,     classifier: 'web',      extension: 'war.asc'],
             [archive: signedJar,     classifier: null,      extension: 'jar.asc']
     ]
 }
@@ -162,16 +156,12 @@ publishing {
 				classifier "javadoc"
 			}
 			
-			/*artifact war {
-				classifier 'web'
-			}*/
-			
             pom.withXml {
                 asNode().children().last() + {
                     resolveStrategy = Closure.DELEGATE_FIRST
                     name 'jappy-framework'
                     packaging 'jar'
-					description 'jappy-framework'
+		    description 'jappy-framework'
                     url 'https://github.com/jarsj/jappy-framework'
                     scm {
                         url 'scm:git@github.com:jarsj/jappy-framework.git'
