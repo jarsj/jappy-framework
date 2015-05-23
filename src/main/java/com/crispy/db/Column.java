@@ -64,7 +64,7 @@ public class Column {
 
 	public static Column text(String name, int length, String def) {
 		Column c = Column.text(name, length);
-		c.def = "'" + def + "'";
+		c.def = def;
 		return c;
 	}
 
@@ -148,7 +148,12 @@ public class Column {
 		sb.append("`" + name + "` ");
 		sb.append(type);
 		if (def != null) {
-			sb.append(" DEFAULT " + def);
+			sb.append(" DEFAULT ");
+			if (type.startsWith("VARCHAR") || type.contains("TEXT")) {
+				sb.append("'" + def + "'");
+			} else {
+				sb.append(def);
+			}
 		} else if (autoIncrement)
 			sb.append(" PRIMARY KEY AUTO_INCREMENT");
 		JSONObject commentJSON = commentJSON();
