@@ -12,10 +12,10 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 
 import javax.servlet.http.HttpServletResponse;
 
+import com.crispy.net.Get;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpEntity;
@@ -25,7 +25,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 
-import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.ec2.AmazonEC2;
@@ -39,7 +38,6 @@ import com.amazonaws.services.ec2.model.RunInstancesResult;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.AccessControlList;
-import com.amazonaws.services.s3.model.Bucket;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GroupGrantee;
@@ -53,7 +51,6 @@ import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.util.StringInputStream;
 import com.crispy.log.Log;
-import com.crispy.net.Net;
 
 /**
  * Cloud
@@ -70,7 +67,6 @@ public class Cloud {
 	private static final Log LOG = Log.get("cloud");
 
 	public static boolean localMode = false;
-	public static boolean connected;
 	private static AWSCredentials credentials;
 
 	public static void init(String credentialsFile) throws Exception {
@@ -78,15 +74,12 @@ public class Cloud {
 		props.load(new FileReader(credentialsFile));
 		credentials = new BasicAWSCredentials(props.getProperty("accessKey"), 
 				props.getProperty("secretKey"));
-		connected = false;
 		System.setProperty("com.amazonaws.sdk.disableCertChecking", "true");
-		reloadBuckets();
 	}
 
 	private static String defaultSecurityGroup = null;
 	private static String defaultKeyPair = null;
 
-	private static ConcurrentHashMap<String, Boolean> mBuckets;
 	private Set<String> keys;
 	private boolean neverExpire;
 
@@ -100,21 +93,6 @@ public class Cloud {
 
 	public static AWSCredentials getCredentials() {
 		return credentials;
-	}
-
-	private static void reloadBuckets() {
-		mBuckets = new ConcurrentHashMap<String, Boolean>();
-		try {
-			AmazonS3Client client = new AmazonS3Client(credentials);
-			for (Bucket b : client.listBuckets()) {
-				mBuckets.put(b.getName(), true);
-			}
-			connected = true;
-			client.shutdown();
-		} catch (AmazonClientException t) {
-			LOG.error("Unable to connect with amazon");
-		}
-		LOG.info("Initialize S3 with " + mBuckets.size() + " buckets");
 	}
 
 	private AmazonS3Client s3;
@@ -153,17 +131,15 @@ public class Cloud {
 	}
 
 	public Cloud create() {
-		if (!mBuckets.containsKey(bucket)) {
+		if (!s3.doesBucketExist(bucket)) {
 			s3.createBucket(bucket);
-			reloadBuckets();
 		}
 		return this;
 	}
 
 	public Cloud create(String region) {
-		if (!mBuckets.containsKey(bucket)) {
+		if (!s3.doesBucketExist(bucket)) {
 			s3.createBucket(bucket, region);
-			reloadBuckets();
 		}
 		return this;
 	}
@@ -343,7 +319,7 @@ public class Cloud {
 		ObjectMetadata metadata = new ObjectMetadata();
 		if (value.getName().endsWith("png")) {
 			metadata.setContentType("image/png");
-		} else if (value.getName().endsWith("jpg")) {
+		} else if (value.getName().endsWith("jpg") || value.getName().endsWith("jpeg")) {
 			metadata.setContentType("image/jpg");
 		}
 		if (neverExpire) {
@@ -388,18 +364,19 @@ public class Cloud {
 
 	public static String userData() {
 		try {
-			return Net.get("http://169.254.169.254/latest/user-data", 5);
+			return Get.create().withUrl("http://169.254.169.254/latest/user-data").withTimeout(5).response();
 		} catch (Exception e) {
-			LOG.error(e.getMessage(), e);
+			LOG.warn(e.getMessage(), e);
 			return null;
 		}
 	}
 
 	public static String instanceId() {
 		try {
-			return Net.get("http://169.254.169.254/latest/meta-data/instance-id", 5).trim();
+			return Get.create().withUrl("http://169.254.169.254/latest/meta-data/instance-id").withTimeout(5)
+					.response();
 		} catch (Exception e) {
-			LOG.error(e.getMessage(), e);
+			LOG.warn(e.getMessage(), e);
 			return "local";
 		}
 	}

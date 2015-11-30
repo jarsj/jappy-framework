@@ -9,10 +9,15 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.TimeZone;
 
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -28,7 +33,9 @@ public class Column {
 
 	String comment_folder;
 	String comment_s3;
+	boolean comment_base64;
 	String[] comment_cloudfront;
+	String comment_dimensions;
 
 	public Column(String name, String type) {
 		this.name = name;
@@ -41,9 +48,28 @@ public class Column {
 		return type;
 	}
 
+	/**
+	 * File stored as base64.
+	 * 
+	 * @param name
+	 * @return
+	 */
+	public static Column base64(String name) {
+		Column c = new Column(name, "TEXT");
+		c.comment_base64 = true;
+		return c;
+	}
+
 	public static Column file(String name, String folder) {
 		Column c = new Column(name, "VARCHAR(512)");
 		c.comment_folder = folder;
+		return c;
+	}
+
+	public static Column image(String name, String bucket, int width, int height) {
+		Column c = new Column(name, "VARCHAR(512)");
+		c.comment_s3 = bucket;
+		c.comment_dimensions = String.format("(%d,%d)", width, height);
 		return c;
 	}
 
@@ -96,6 +122,8 @@ public class Column {
 		Column c = new Column(name, "TIMESTAMP");
 		if (def)
 			c.def = "CURRENT_TIMESTAMP";
+		else
+			c.def = "0000-00-00 00:00:00";
 		return c;
 	}
 
@@ -137,8 +165,14 @@ public class Column {
 		if (comment_s3 != null) {
 			ret.put("s3", comment_s3);
 		}
+		if (comment_base64) {
+			ret.put("base64", true);
+		}
 		if (comment_cloudfront != null) {
 			ret.put("cloudfront", new JSONArray(Arrays.asList(comment_cloudfront)));
+		}
+		if (comment_dimensions != null) {
+			ret.put("dimensions", comment_dimensions);
 		}
 		return ret;
 	}
@@ -151,6 +185,12 @@ public class Column {
 			sb.append(" DEFAULT ");
 			if (type.startsWith("VARCHAR") || type.contains("TEXT")) {
 				sb.append("'" + def + "'");
+			} else if (type.equals("TIMESTAMP")) {
+				if (!def.equals("CURRENT_TIMESTAMP")) {
+					sb.append("'" + def + "'");
+				} else {
+					sb.append(def);
+				}
 			} else {
 				sb.append(def);
 			}
@@ -177,7 +217,7 @@ public class Column {
 		Column c = new Column(columnName, type);
 		c.def = results.getString("COLUMN_DEF");
 		c.autoIncrement = results.getString("IS_AUTOINCREMENT").equals("YES");
-		
+
 		JSONObject commentJSON = parseComment(results.getString("REMARKS"));
 		if (commentJSON.has("folder")) {
 			c.comment_folder = commentJSON.getString("folder");
@@ -185,12 +225,18 @@ public class Column {
 		if (commentJSON.has("s3")) {
 			c.comment_s3 = commentJSON.getString("s3");
 		}
+		if (commentJSON.has("dimensions")) {
+			c.comment_dimensions = commentJSON.getString("dimensions");
+		}
 		if (commentJSON.has("cloudfront")) {
 			JSONArray cfArray = commentJSON.getJSONArray("cloudfront");
 			c.comment_cloudfront = new String[cfArray.length()];
 			for (int i = 0; i < cfArray.length(); i++) {
 				c.comment_cloudfront[i] = cfArray.getString(i);
 			}
+		}
+		if (commentJSON.has("base64")) {
+			c.comment_base64 = true;
 		}
 		if (type.equals("VARCHAR")) {
 			c.type = "VARCHAR(" + results.getInt("COLUMN_SIZE") + ")";
@@ -230,126 +276,134 @@ public class Column {
 	}
 
 	public Object parseObject(Object value) {
-		if (value == null)
-			return null;
-		if (type.endsWith("TEXT") || type.startsWith("VARCHAR")) {
-			if (comment_folder != null) {
-				String uploadFolder = comment_folder;
-				if (value instanceof File) {
-					try {
+		try {
+			if (value == null)
+				return null;
+			if (type.endsWith("TEXT") || type.startsWith("VARCHAR")) {
+				if (comment_folder != null) {
+					String uploadFolder = comment_folder;
+					if (value instanceof File) {
 						return Image.uploadFile(uploadFolder, new FileInputStream((File) value), ((File) value).getName());
-					} catch (Exception e) {
-						return null;
-					}
-				} else if (value instanceof URL) {
-					try {
+					} else if (value instanceof URL) {
 						return Image.uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value).getPath());
-					} catch (Exception e) {
-						return null;
+					} else {
+						return value.toString();
+					}
+				} else if (comment_s3 != null) {
+					String s3Bucket = comment_s3;
+					String dimensions = comment_dimensions;
+					int width = -1, height = -1;
+					if (dimensions != null) {
+						dimensions = dimensions.substring(1, dimensions.length() - 1);
+						width = Integer.parseInt(dimensions.split(",")[0]);
+						height = Integer.parseInt(dimensions.split(",")[1]);
+					}
+					if (value instanceof File) {
+						return Image.getInstance()
+								.uploadS3Async(s3Bucket, new FileInputStream((File) value), ((File) value).getName(), width, height);
+					} else if (value instanceof URL) {
+						return Image.getInstance().uploadS3Async(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath(), width, height);
+					} else {
+						return value.toString();
+					}
+				} else if (comment_base64) {
+					if (value instanceof File) {
+						return new String(Base64.encodeBase64(IOUtils.toByteArray(new FileInputStream((File) value))));
+					} else if (value instanceof URL) {
+						return new String(Base64.encodeBase64(IOUtils.toByteArray(((URL) value).openStream())));
+					} else {
+						return new String(Base64.encodeBase64(value.toString().getBytes()));
 					}
 				} else {
 					return value.toString();
 				}
-			} else if (comment_s3 != null) {
-				String s3Bucket = comment_s3;
-				if (value instanceof File) {
-					try {
-						return Image.uploadS3(s3Bucket, new FileInputStream((File) value), ((File) value).getName());
-					} catch (Exception e) {
-						throw new IllegalStateException("Can not upload " + value, e);
-					}
-				} else if (value instanceof URL) {
-					try {
-						return Image.uploadS3(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath());
-					} catch (Exception e) {
-						throw new IllegalStateException("Can not upload " + value.toString(), e);
-					}
-				} else {
-					return value.toString();
-				}
-			} else {
-				return value.toString();
 			}
-		}
-		if (type.equals("BIGINT")) {
-			if (value.toString().trim().length() == 0)
-				return null;
-			return Long.parseLong(value.toString());
-		}
-		if (type.equals("TIME")) {
-			if (value instanceof String) {
-				return parseTime((String) value);
-			}
-			if (value instanceof Long) {
-				return DB.formatAsTime(new Date((Long) value));
-			}
-			if (value instanceof Date) {
-				return value;
-			}
-			if (value instanceof java.util.Date)
-				return DB.formatAsTime((java.util.Date) value);
-			throw new IllegalArgumentException("Value should be of type time");
-		}
-
-		if (type.equals("DATE")) {
-			if (value instanceof String) {
-				return parseDate((String) value);
-			}
-			if (value instanceof Long)
-				return DB.formatAsDate(new Date((Long) value));
-			if (value instanceof Calendar)
-				return DB.formatAsDate((Calendar) value);
-			if (value instanceof Date)
-				return value;
-			if (value instanceof java.util.Date)
-				return DB.formatAsDate((java.util.Date) value);
-			throw new IllegalArgumentException("Value should be of type date");
-		}
-		if (type.equals("DATETIME")) {
-			if (value instanceof String) {
-				return parseDateTime((String) value);
-			}
-			if (value instanceof Date)
-				return value;
-			if (value instanceof java.util.Date)
-				return DB.formatAsDateTime((java.util.Date) value);
-			throw new IllegalArgumentException("Value should be of type date");
-		}
-		if (type.equals("TIMESTAMP")) {
-			if (value instanceof String) {
-				if (((String) value).trim().length() == 0)
+			if (type.equals("BIGINT")) {
+				if (value.toString().trim().length() == 0)
 					return null;
-				return new Timestamp(Long.parseLong((String) value));
+				return Long.parseLong(value.toString());
 			}
-			if (value instanceof java.util.Date)
-				return new Timestamp(((java.util.Date) value).getTime());
-			if (value instanceof Date)
-				return new Timestamp(((Date) value).getTime());
-			if (value instanceof Calendar)
-				return new Timestamp(((Calendar) value).getTimeInMillis());
-			if (value instanceof Timestamp)
-				return value;
-			if (value instanceof Long)
-				return new Timestamp((Long) value);
-			throw new IllegalArgumentException("Value should be of type Timestamp");
-		}
-		if (type.equals("INT")) {
-			if (value.toString().trim().length() == 0)
-				return null;
-			return Integer.parseInt(value.toString().trim());
-		}
-		if (type.equals("FLOAT")) {
-			if (value.toString().trim().length() == 0)
-				return null;
-			return Float.parseFloat(value.toString().trim());
-		}
-		if (type.equals("BOOL")) {
-			if (value.toString().trim().length() == 0)
-				return null;
-			return Boolean.parseBoolean(value.toString().trim());
-		}
+			if (type.equals("TIME")) {
+				if (value instanceof String) {
+					return parseTime((String) value);
+				}
+				if (value instanceof Long) {
+					return DB.formatAsTime(new Date((Long) value));
+				}
+				if (value instanceof Date) {
+					return value;
+				}
+				if (value instanceof java.util.Date)
+					return DB.formatAsTime((java.util.Date) value);
+				throw new IllegalArgumentException("Value should be of type time");
+			}
 
-		return value;
+			if (type.equals("DATE")) {
+				if (value instanceof String) {
+					return parseDate((String) value);
+				}
+				if (value instanceof Long)
+					return DB.formatAsDate(new Date((Long) value));
+				if (value instanceof Calendar)
+					return DB.formatAsDate((Calendar) value);
+				if (value instanceof Date)
+					return value;
+				if (value instanceof LocalDate)
+					return value;
+				if (value instanceof java.util.Date)
+					return DB.formatAsDate((java.util.Date) value);
+				throw new IllegalArgumentException("Value should be of type date");
+			}
+			if (type.equals("DATETIME")) {
+				if (value instanceof String) {
+					return parseDateTime((String) value);
+				}
+				if (value instanceof Date)
+					return value;
+				if (value instanceof java.util.Date)
+					return DB.formatAsDateTime((java.util.Date) value);
+				throw new IllegalArgumentException("Value should be of type date");
+			}
+			if (type.equals("TIMESTAMP")) {
+				if (value instanceof String) {
+					if (((String) value).trim().length() == 0)
+						return null;
+					return new Timestamp(Long.parseLong((String) value));
+				}
+				if (value instanceof java.util.Date)
+					return new Timestamp(((java.util.Date) value).getTime());
+				if (value instanceof Date)
+					return new Timestamp(((Date) value).getTime());
+				if (value instanceof Calendar)
+					return new Timestamp(((Calendar) value).getTimeInMillis());
+				if (value instanceof Timestamp)
+					return value;
+				if (value instanceof Long)
+					return new Timestamp((Long) value);
+				if (value instanceof LocalDateTime)
+					return value;
+				throw new IllegalArgumentException("Value should be of type Timestamp");
+			}
+			if (type.equals("INT")) {
+				if (value.toString().trim().length() == 0)
+					return null;
+				return Integer.parseInt(value.toString().trim());
+			}
+			if (type.equals("FLOAT")) {
+				if (value.toString().trim().length() == 0)
+					return null;
+				return Float.parseFloat(value.toString().trim());
+			}
+			if (type.equals("BOOL")) {
+				if (value.toString().trim().length() == 0)
+					return null;
+				return Boolean.parseBoolean(value.toString().trim());
+			}
+
+			return value;
+		} catch (Exception e) {
+			throw new IllegalArgumentException("Can not parse value = " + value);
+		}
 	}
 
 	public String getName() {
@@ -359,13 +413,15 @@ public class Column {
 	public boolean isAutoIncrement() {
 		return autoIncrement;
 	}
-	
+
 	private SimpleType internalSimpleType() {
 		if (type.startsWith("VARCHAR")) {
 			if (comment_folder != null) {
 				return SimpleType.FILE;
 			} else if (comment_s3 != null) {
 				return SimpleType.S3;
+			} else if (comment_base64) {
+				return SimpleType.BASE64;
 			} else {
 				String temp = type.substring(type.indexOf('(') + 1, type.indexOf(')'));
 				int length = Integer.parseInt(temp);
@@ -386,8 +442,10 @@ public class Column {
 			return SimpleType.DATETIME;
 		if (type.equals("TIMESTAMP"))
 			return SimpleType.TIMESTAMP;
-		if (type.endsWith("INT")) 
+		if (type.endsWith("INT"))
 			return SimpleType.INTEGER;
+		if (type.equals("BOOL"))
+			return SimpleType.BOOL;
 		
 		return SimpleType.TEXT;
 	}
@@ -402,7 +460,7 @@ public class Column {
 				return SimpleType.TEXT;
 			}
 		}
-		
+
 		return internalSimpleType();
 	}
 
@@ -459,7 +517,8 @@ public class Column {
 	}
 
 	public boolean isDisplayAsURL() {
-		if (comment_s3 != null) return true;
+		if (comment_s3 != null)
+			return true;
 		return false;
 	}
 

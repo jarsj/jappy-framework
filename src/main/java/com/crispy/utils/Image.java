@@ -2,93 +2,53 @@ package com.crispy.utils;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ProcessBuilder.Redirect;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import javax.imageio.ImageIO;
 import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.imgscalr.Scalr;
 import org.imgscalr.Scalr.Method;
 import org.imgscalr.Scalr.Mode;
-import org.json.JSONObject;
 
 import com.crispy.cloud.Cloud;
 import com.crispy.log.Log;
 
-@WebServlet(urlPatterns = { "/resource", "/resource/*" })
-public class Image extends HttpServlet {
+public class Image {
+
+	private static final Image INSTANCE = new Image();
+
+	private ScheduledExecutorService background;
+
+	private Image() {
+		background = Executors.newSingleThreadScheduledExecutor();
+		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					background.shutdown();
+				} catch (Throwable t) {
+				}
+			}
+		}));
+	}
+
+	public static Image getInstance() {
+		return INSTANCE;
+	}
 
 	private static final Log LOG = Log.get("resource");
-
-	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		String fileName = req.getPathInfo();
-		LOG.info(fileName);
-		if (fileName.startsWith("/class")) {
-			doClass(fileName.substring(fileName.indexOf('/', 1)), resp);
-		} else if (fileName.startsWith("/local")) {
-			doLocal(fileName.substring(fileName.indexOf('/', 1)), resp);
-		}
-	}
-
-	private void doClass(String path, HttpServletResponse resp) throws IOException {
-		LOG.info(path);
-		IOUtils.copy(getClass().getResourceAsStream(path), resp.getOutputStream());
-		resp.getOutputStream().flush();
-	}
-
-	private void doLocal(String path, HttpServletResponse resp) throws IOException {
-		String extension = path.substring(path.lastIndexOf('.') + 1);
-		if (extension.equals("jpg")) {
-			extension = "jpeg";
-		}
-		File realFile = new File(path);
-		if (!realFile.exists()) {
-			resp.setStatus(402);
-			return;
-		}
-		resp.setContentType("image/" + extension);
-		IOUtils.copy(new FileInputStream(realFile), resp.getOutputStream());
-		resp.getOutputStream().flush();
-	}
-
-	@Override
-	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		try {
-			String sourceFileName = req.getHeader("X-File-Name");
-			String uploadFolder = req.getParameter("folder");
-			String s3Bucket = req.getParameter("bucket");
-
-			if (uploadFolder != null) {
-				resp.getWriter()
-						.write(new JSONObject().put("success", true).put("value", uploadFile(uploadFolder, req.getInputStream(), sourceFileName))
-								.toString());
-				resp.getWriter().flush();
-			} else if (s3Bucket != null) {
-				resp.getWriter().write(
-						new JSONObject().put("success", true).put("value", uploadS3(s3Bucket, req.getInputStream(), sourceFileName)).toString());
-				resp.getWriter().flush();
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			resp.setStatus(resp.SC_INTERNAL_SERVER_ERROR);
-			resp.getWriter().print("{success: false}");
-			resp.getWriter().flush();
-		}
-	}
 
 	public static String uploadFile(String uploadFolder, InputStream input, String fileName) throws FileNotFoundException, IOException {
 		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
@@ -100,12 +60,85 @@ public class Image extends HttpServlet {
 		return f.getAbsolutePath().toString();
 
 	}
+	
+	private void resizeImage(File raw, File output, int width, int height, File tmpFolder) throws ServletException {
+		try {
+			if (raw == null || output == null || !raw.exists())
+				throw new ServletException("One of the argument " + raw + " , " + output + " is null");
+			String fileExtension = FilenameUtils.getExtension(raw.getName()).toLowerCase();
+			ProcessBuilder pb;
+			if (fileExtension.equals("mp4") || fileExtension.equals("webm")) {
+				pb = new ProcessBuilder("/usr/bin/ffmpeg", "-i", raw.getAbsolutePath(), "-vf", "thumbnail,scale=" + width + ":height", "-frames:v", "1",
+						output.getAbsolutePath());
+			} else if (fileExtension.equals("psd")) {
+				pb = new ProcessBuilder("/usr/bin/convert", raw.getAbsolutePath() + "[0]", "-auto-orient", "-strip", "-thumbnail", width + "x"
+						+ height, output.getAbsolutePath());
+			} else {
+				pb = new ProcessBuilder("/usr/bin/convert", 
+						raw.getAbsolutePath(),// 
+						"-filter", //
+						"Lanczos",// 
+						"-sampling-factor",// 
+						"1x1",// 
+						"-quality",// 
+						"100",// 
+						"-unsharp",// 
+						"1.5x0.7+0.02",// 
+						 "-resize",// 
+						 width + "x" + height + "!",
+						output.getAbsolutePath());
+			}
+			if (tmpFolder != null) {
+				pb.directory(tmpFolder);
+			}
+
+			pb.redirectErrorStream(true);
+			pb.redirectOutput(Redirect.to(new File("/dev/null")));
+			Process p = pb.start();
+			int result = p.waitFor();
+			if (result != 0) {
+				throw new ServletException();
+			}
+		} catch (Exception e) {
+			throw new ServletException(e);
+		}
+	}
+
+
+	public String uploadS3Async(String s3Bucket, final InputStream input, String fileName, final int width, final int height) throws FileNotFoundException, IOException {
+		final String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
+		final String nextID = UUID.randomUUID().toString().toLowerCase();
+		String s3Comps[] = s3Bucket.split("/");
+
+		final String bucket = s3Comps[0];
+		s3Comps = (String[]) ArrayUtils.remove(s3Comps, 0);
+		final String parent = (s3Comps.length == 0) ? "" : (StringUtils.join(s3Comps, "/") + "/");
+
+		background.execute(new Runnable() {
+
+			@Override
+			public void run() {
+				try {
+					File tmp = File.createTempFile("image", ext);
+					IOUtils.copy(input, new FileOutputStream(tmp));
+					File output = File.createTempFile("image_output", ext);
+					resizeImage(tmp, output, width, height, null);					
+					Cloud.s3(bucket).create().allowRead().neverExpire().upload(parent + nextID + "." + ext, output);
+				} catch (Throwable t) {
+					t.printStackTrace();
+					LOG.error("Error uploading image " + parent + nextID + "." + ext, t);
+				}
+			}
+		});
+
+		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext;
+	}
 
 	public static String uploadS3(String s3Bucket, InputStream input, String fileName) throws FileNotFoundException, IOException {
 		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
 		String nextID = UUID.randomUUID().toString().toLowerCase();
 		String s3Comps[] = s3Bucket.split("/");
-
+		
 		String bucket = s3Comps[0];
 		s3Comps = (String[]) ArrayUtils.remove(s3Comps, 0);
 		String parent = (s3Comps.length == 0) ? "" : (StringUtils.join(s3Comps, "/") + "/");

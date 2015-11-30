@@ -1,5 +1,6 @@
 package com.crispy.mail;
 
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,41 +28,36 @@ import org.json.JSONObject;
  * 
  * @author harsh
  */
-public class Mail implements Runnable {
-	private static Mail INSTANCE = new Mail();
-	private Properties props;
-	private String username;
-	private String password;
-	private ScheduledExecutorService background;
-	private ConcurrentHashMap<String, LinkedBlockingQueue<String>> queue;
-	
-	public Mail() {
-	}
-	
-	public void start(String host, String username, String password) {
-		start(host, 25, username, password);
-	}
+public class Mail {
+	private static Properties props;
+	private static String username;
+	private static String password;
 
-	public void start(String host, int port, String username, String password) {
+	private static ScheduledExecutorService background;
+	private static ConcurrentHashMap<String, LinkedBlockingQueue<String>> queue;
+
+	public static void init(String credentialsFile) throws Exception {
+		Properties cProps = new Properties();
+		cProps.load(new FileReader(credentialsFile));
+
 		props = new Properties();
-		props.put("mail.smtp.host", host);
+		props.put("mail.smtp.host", cProps.getProperty("smtpServer", "email-smtp.us-east-1.amazonaws.com"));
 		props.put("mail.smtp.starttls.enable", "true");
 		props.put("mail.smtp.auth", "true");
-	    props.put("mail.smtp.port", port);
+		props.put("mail.smtp.port", Integer.parseInt(cProps.getProperty("smtpPort", "587")));
 
-		this.username = username;
-		this.password = password;
+		username = cProps.getProperty("smtpUsername");
+		password = cProps.getProperty("smtpPassword");
+		
+		if (username == null || password == null) 
+			throw new IllegalStateException("Define smtpUsername or password");
 
 		background = Executors.newSingleThreadScheduledExecutor();
 		queue = new ConcurrentHashMap<String, LinkedBlockingQueue<String>>();
-		background.scheduleAtFixedRate(this, 0, 1, TimeUnit.MINUTES);
+		background.scheduleAtFixedRate(sendEmailRunnable, 0, 1, TimeUnit.MINUTES);
 	}
 
-	public static Mail getInstance() {
-		return INSTANCE;
-	}
-
-	public void send(String from, String to, String subject, String body)  {
+	public static void send(String from, String to, String subject, String body) {
 		try {
 			internalSend(new Authenticator() {
 				protected PasswordAuthentication getPasswordAuthentication() {
@@ -73,23 +69,20 @@ public class Mail implements Runnable {
 		}
 	}
 
-	public void queue(String to, String subject, String body) {
+	public static void queue(String to, String subject, String body) {
 		LinkedBlockingQueue<String> q = queue.get(to);
 		if (q == null) {
 			q = new LinkedBlockingQueue<String>();
 			queue.put(to, q);
 		}
 		try {
-			q.add(new JSONObject().put("to", to).put("subject", subject)
-					.put("body", body).toString());
+			q.add(new JSONObject().put("to", to).put("subject", subject).put("body", body).toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	private void internalSend(Authenticator auth, String from, String to,
-			String subject, String body) throws AddressException,
-			MessagingException {
+	private static void internalSend(Authenticator auth, String from, String to, String subject, String body) throws AddressException, MessagingException {
 		Session session = Session.getDefaultInstance(props, auth);
 		MimeMessage message = new MimeMessage(session);
 		message.setFrom(new InternetAddress(from));
@@ -100,47 +93,47 @@ public class Mail implements Runnable {
 
 	}
 
-	@Override
-	public void run() {
-		try {
+	private static final Runnable sendEmailRunnable = new Runnable() {
 
-			Authenticator auth = new Authenticator() {
-				protected PasswordAuthentication getPasswordAuthentication() {
-					return new PasswordAuthentication(username, password);
-				}
-			};
+		@Override
+		public void run() {
+			try {
 
-			for (Map.Entry<String, LinkedBlockingQueue<String>> entry : queue
-					.entrySet()) {
-				String to = entry.getKey();
-				LinkedBlockingQueue<String> q = entry.getValue();
-
-				ArrayList<String> t = new ArrayList<String>();
-				q.drainTo(t);
-
-				HashMap<String, StringBuilder> bySubjects = new HashMap<String, StringBuilder>();
-
-				for (String mail : t) {
-					JSONObject o = new JSONObject(mail);
-					StringBuilder body = bySubjects.get(o.getString("subject"));
-					if (body == null) {
-						body = new StringBuilder();
-						bySubjects.put(o.getString("subject"), body);
+				Authenticator auth = new Authenticator() {
+					protected PasswordAuthentication getPasswordAuthentication() {
+						return new PasswordAuthentication(username, password);
 					}
-					body.append("\n\n");
-					body.append(o.getString("body"));
-				}
+				};
 
-				for (Map.Entry<String, StringBuilder> entry2 : bySubjects
-						.entrySet()) {
-					internalSend(auth, "harsh@zopte.com", to, entry2.getKey(),
-							entry2.getValue().toString());
+				for (Map.Entry<String, LinkedBlockingQueue<String>> entry : queue.entrySet()) {
+					String to = entry.getKey();
+					LinkedBlockingQueue<String> q = entry.getValue();
+
+					ArrayList<String> t = new ArrayList<String>();
+					q.drainTo(t);
+
+					HashMap<String, StringBuilder> bySubjects = new HashMap<String, StringBuilder>();
+
+					for (String mail : t) {
+						JSONObject o = new JSONObject(mail);
+						StringBuilder body = bySubjects.get(o.getString("subject"));
+						if (body == null) {
+							body = new StringBuilder();
+							bySubjects.put(o.getString("subject"), body);
+						}
+						body.append("\n\n");
+						body.append(o.getString("body"));
+					}
+
+					for (Map.Entry<String, StringBuilder> entry2 : bySubjects.entrySet()) {
+						internalSend(auth, "harsh@zopte.com", to, entry2.getKey(), entry2.getValue().toString());
+					}
 				}
+			} catch (Throwable t) {
+				t.printStackTrace();
 			}
-		} catch (Throwable t) {
-			t.printStackTrace();
 		}
-	}
+	};
 
 	public void shutdown() {
 		if (background != null) {

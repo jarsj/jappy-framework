@@ -5,10 +5,12 @@ public enum SimpleType {
 	LONGTEXT,
 	INTEGER,
 	FILE,
+	BASE64,
 	S3,
 	DATE,
 	TIME,
 	DATETIME,
 	TIMESTAMP,
-	REFERENCE
+	REFERENCE,
+	BOOL
 }

@@ -7,9 +7,10 @@ import org.slf4j.LoggerFactory;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.PatternLayout;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
-import ch.qos.logback.classic.filter.LevelFilter;
 import ch.qos.logback.classic.filter.ThresholdFilter;
+import ch.qos.logback.classic.sift.MDCBasedDiscriminator;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.ConsoleAppender;
 import ch.qos.logback.core.FileAppender;
@@ -18,7 +19,7 @@ import ch.qos.logback.core.rolling.RollingFileAppender;
 import ch.qos.logback.core.rolling.S3TimeBasedRollingPolicy;
 import ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP;
 import ch.qos.logback.core.rolling.TimeBasedRollingPolicy;
-import ch.qos.logback.core.spi.FilterReply;
+import ch.qos.logback.core.spi.CyclicBufferTracker;
 
 /**
  * Logging Library. Captures the most common usecases of logging.
@@ -32,15 +33,31 @@ public class Log {
 	private Log(String name) {
 		LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
 		this.logger = context.getLogger(name);
-		this.logger.setAdditive(false);
 		this.logger.setLevel(Level.ALL);
+		this.logger.detachAndStopAllAppenders();
 	}
 
 	public static Log get(String name) {
 		return new Log(name);
 	}
 
+	public static Log getRoot() {
+		return new Log(Logger.ROOT_LOGGER_NAME);
+	}
+
+	public Log inherit(boolean inherit) {
+		this.logger.setAdditive(inherit);
+		return this;
+	}
+
 	public Log appender(Appender appender) {
+		if (appender.name != null) {
+			logger.detachAppender(appender.name);
+		}
+		if (appender.smtpHost != null) {
+			return smtpAppender(appender);
+		}
+
 		PatternLayoutEncoder encoder = new PatternLayoutEncoder();
 		encoder.setContext(logger.getLoggerContext());
 		encoder.setPattern(appender.pattern);
@@ -58,9 +75,11 @@ public class Log {
 			TimeBasedRollingPolicy<ILoggingEvent> policy = null;
 			if (appender.s3bucket != null) {
 				policy = new S3TimeBasedRollingPolicy<ILoggingEvent>();
-				((S3TimeBasedRollingPolicy<ILoggingEvent>) policy).setS3BucketName(appender.s3bucket);
-				((S3TimeBasedRollingPolicy<ILoggingEvent>) policy).setS3FolderName(appender.s3folder + "/" + logger.getName());
-				((S3TimeBasedRollingPolicy<ILoggingEvent>) policy).setRollingOnExit(true);
+				S3TimeBasedRollingPolicy<ILoggingEvent> s3Policy = (S3TimeBasedRollingPolicy<ILoggingEvent>) policy;
+				s3Policy.setS3BucketName(appender.s3bucket);
+				s3Policy.setS3FolderName(appender.s3folder + "/" + logger.getName());
+				s3Policy.setS3UniqueId(appender.s3UniqueId);
+				s3Policy.setRollingOnExit(true);
 			} else {
 				policy = new TimeBasedRollingPolicy<ILoggingEvent>();
 			}
@@ -71,10 +90,21 @@ public class Log {
 
 			policy.setParent((FileAppender) ret);
 			policy.setContext(logger.getLoggerContext());
+			// Rolling happens based on the filename pattern. Took a while to
+			// discover this.
+
 			if (appender.size != null) {
-				policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd}.%i.log");
+				if (appender.hourly) {
+					policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd-HH}.%i.log");
+				} else {
+					policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd}.%i.log");
+				}
 			} else {
-				policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd}.log");
+				if (appender.hourly) {
+					policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd-HH}.log");
+				} else {
+					policy.setFileNamePattern(appender.folder + "/" + logger.getName() + "-%d{yyyy-MM-dd}.log");
+				}
 			}
 
 			policy.start();
@@ -92,6 +122,9 @@ public class Log {
 			((RollingFileAppender<ILoggingEvent>) ret).setRollingPolicy(policy);
 		}
 
+		if (appender.name != null)
+			ret.setName(appender.name);
+
 		if (appender.level != null) {
 			ThresholdFilter lf = new ThresholdFilter();
 			lf.setLevel(appender.level.toString());
@@ -99,7 +132,7 @@ public class Log {
 			lf.start();
 			ret.addFilter(lf);
 		}
-		
+
 		ret.setEncoder(encoder);
 		ret.start();
 
@@ -107,36 +140,40 @@ public class Log {
 		return this;
 	}
 
-	/*
-	 * public Log mail(String host, int port, String username, String password,
-	 * boolean tls) { SMTPAppender appender = new SMTPAppender();
-	 * appender.setContext(logger.getLoggerContext());
-	 * appender.setSMTPHost(host); appender.setSmtpPort(port);
-	 * appender.setUsername(username); appender.setPassword(password);
-	 * CyclicBufferTracker<ILoggingEvent> cbTracker = new
-	 * CyclicBufferTracker<ILoggingEvent>(); cbTracker.setBufferSize(10);
-	 * appender.setCyclicBufferTracker(cbTracker);
-	 * appender.setFrom("harsh@redhotcasino.in");
-	 * appender.addTo("harsh@crispygam.es");
-	 * 
-	 * appender.setSTARTTLS(tls);
-	 * 
-	 * PatternLayout layout = new PatternLayout();
-	 * layout.setContext(logger.getLoggerContext()); if (pattern != null) {
-	 * layout.setPattern(pattern); } else { layout.setPattern(
-	 * "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"); }
-	 * 
-	 * layout.start(); appender.setLayout(layout);
-	 * 
-	 * MDCBasedDiscriminator discriminator = new MDCBasedDiscriminator();
-	 * discriminator.setContext(logger.getLoggerContext());
-	 * discriminator.setKey("req.remoteHost"); discriminator.start();
-	 * appender.setDiscriminator(discriminator);
-	 * 
-	 * appender.start();
-	 * 
-	 * logger.addAppender(appender); return this; }
-	 */
+	private Log smtpAppender(Appender appender) {
+		CrispySMTPAppender ret = new CrispySMTPAppender();
+		ret.setContext(logger.getLoggerContext());
+		ret.setSMTPHost(appender.smtpHost);
+		ret.setSmtpPort(appender.smtpPort);
+		ret.setUsername(appender.smtpUsername);
+		ret.setPassword(appender.smtpPassword);
+
+		CyclicBufferTracker<ILoggingEvent> cbTracker = new CyclicBufferTracker<ILoggingEvent>();
+		cbTracker.setBufferSize(10);
+		ret.setCyclicBufferTracker(cbTracker);
+		ret.setFrom(appender.mailFrom);
+		ret.addTo(appender.mailTo);
+
+		ret.setSTARTTLS(appender.smtpTls);
+		ret.setSSL(appender.smtpSsl);
+
+		PatternLayout layout = new PatternLayout();
+		layout.setContext(logger.getLoggerContext());
+		layout.setPattern(appender.pattern);
+		layout.start();
+		ret.setLayout(layout);
+
+		MDCBasedDiscriminator discriminator = new MDCBasedDiscriminator();
+		discriminator.setContext(logger.getLoggerContext());
+		discriminator.setKey("req.remoteHost");
+		discriminator.start();
+		ret.setDiscriminator(discriminator);
+
+		ret.start();
+
+		logger.addAppender(ret);
+		return this;
+	}
 
 	public void info(String message) {
 		logger.info(message);
@@ -173,11 +210,11 @@ public class Log {
 	public void warn(String message) {
 		logger.warn(message);
 	}
-	
+
 	public void warn(String format, Object message) {
 		logger.warn(format, message);
 	}
-	
+
 	public void warn(String format, Object message1, Object message2) {
 		logger.warn(format, message1, message2);
 	}
@@ -204,5 +241,17 @@ public class Log {
 
 	public void trace(String format, Object message1, Object message2) {
 		logger.trace(format, message1, message2);
+	}
+
+	public boolean isDebugEnabled() {
+		return logger.isDebugEnabled();
+	}
+
+	public boolean isInfoEnabled() {
+		return logger.isInfoEnabled();
+	}
+
+	public boolean isTraceEnabled() {
+		return logger.isTraceEnabled();
 	}
 }

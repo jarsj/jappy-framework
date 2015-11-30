@@ -1,15 +1,15 @@
 /**
-*	Run "gradle clean pP publish" to publish locally
-*
-*	Run "gradle clean pP publish -Pmvncentral=true" command twice to publish in sonatype staging repository
-*	
-*	Should have the following in user-local gradle.properties:
-*	sonatypeUsername=
-*	sonatypePassword=
-*	signing.keyId=
-*	signing.password=
-*	signing.secretKeyRingFile=
-**/
+ * 	Run "gradle clean pP publish" to publish locally
+ *
+ * 	Run "gradle clean pP publish -Pmvncentral=true" command twice to publish in sonatype staging repository
+ *
+ * 	Should have the following in user-local gradle.properties:
+ * 	sonatypeUsername=
+ * 	sonatypePassword=
+ * 	signing.keyId=
+ * 	signing.password=
+ * 	signing.secretKeyRingFile=
+ **/
 
 ['signing', 'java', 'eclipse', 'jetty', 'maven-publish'].each {
     apply plugin: it
@@ -18,35 +18,37 @@
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '3.34'
+version = '3.92'
 
-if(hasProperty("mvncentral")) {
+if (hasProperty("mvncentral")) {
     isMvnCentral = mvncentral
 }
 
 repositories {
-  mavenLocal()
-  mavenCentral()
+    mavenLocal()
+    mavenCentral()
 }
 
 dependencies {
-  compile 'com.amazonaws:aws-java-sdk:1.9.16'
-  compile 'commons-io:commons-io:2.4'
-  compile 'commons-lang:commons-lang:2.6'
-  compile 'org.apache.httpcomponents:httpclient:4.3.5'
-  compile 'commons-dbcp:commons-dbcp:1.4'
-  compile 'ch.qos.logback:logback-classic:1.1.2'
-  compile 'mysql:mysql-connector-java:5.1.32'
-  compile 'org.json:json:20140107'
-  compile 'org.imgscalr:imgscalr-lib:4.2'
-  compile 'com.ibm.icu:icu4j:53.1'
-  compile 'org.pojava:pojava:3.0.2'
-  compile 'javax.mail:javax.mail-api:1.5.2'
-  compile 'com.sun.mail:javax.mail:1.5.2'
-  compile 'org.apache.tomcat.embed:tomcat-embed-logging-juli:8.0.21'
-  compile 'org.apache.tomcat.embed:tomcat-embed-logging-log4j:8.0.21'
-  compile 'org.apache.tomcat.embed:tomcat-embed-websocket:8.0.21'
-  compile 'org.apache.tomcat.embed:tomcat-embed-core:8.0.21'
+    compile 'com.amazonaws:aws-java-sdk:1.9.16'
+    compile 'commons-io:commons-io:2.4'
+    compile 'commons-lang:commons-lang:2.6'
+    compile 'org.apache.httpcomponents:httpclient:4.5.1'
+    compile 'commons-dbcp:commons-dbcp:1.4'
+    compile 'ch.qos.logback:logback-classic:1.1.2'
+    compile 'mysql:mysql-connector-java:5.1.37'
+    compile 'org.json:json:20140107'
+    compile 'org.imgscalr:imgscalr-lib:4.2'
+    compile 'com.ibm.icu:icu4j:53.1'
+    compile 'org.pojava:pojava:3.0.2'
+    compile 'javax.mail:javax.mail-api:1.5.2'
+    compile 'com.sun.mail:javax.mail:1.5.2'
+    compile 'com.maxmind.geoip2:geoip2:2.3.0'
+    compile 'org.apache.tomcat.embed:tomcat-embed-logging-juli:8.0.21'
+    compile 'org.apache.tomcat.embed:tomcat-embed-logging-log4j:8.0.21'
+    compile 'org.apache.tomcat.embed:tomcat-embed-websocket:8.0.21'
+    compile 'org.apache.tomcat.embed:tomcat-embed-core:8.0.21'
+    testCompile "junit:junit:4.11"  // Or whatever version
 }
 
 if (JavaVersion.current().isJava8Compatible()) {
@@ -59,14 +61,14 @@ if (JavaVersion.current().isJava8Compatible()) {
 }
 
 // javadoc.jar generation
-task javadocJar (type: Jar, dependsOn: javadoc) { 
+task javadocJar(type: Jar, dependsOn: javadoc) {
     classifier = 'javadoc'
     from javadoc.destinationDir
 }
 
 // sources.jar generation
 task sourceJar(type: Jar) {
-	classifier = 'sources'
+    classifier = 'sources'
     from sourceSets.main.allJava
 }
 
@@ -92,7 +94,7 @@ artifacts {
 }
 
 // sign all artifacts
-task signJars (type : Sign, dependsOn: [jar, javadocJar, sourceJar]) {
+task signJars(type: Sign, dependsOn: [jar, javadocJar, sourceJar]) {
     sign configurations.archives
 }
 
@@ -103,9 +105,9 @@ task signPom(type: Sign) {
 
 // defining which tasks should be called
 if (project.ext.pomFile.exists()) {
-    task preparePublication (dependsOn : [signJars, signPom])
+    task preparePublication(dependsOn: [signJars, signPom])
 } else {
-    task preparePublication (dependsOn : signJars)
+    task preparePublication(dependsOn: signJars)
 }
 
 // extract signatures and add classifier and extension to them
@@ -117,51 +119,51 @@ def getSignatureFiles = {
     return [
             [archive: signedSources, classifier: 'sources', extension: 'jar.asc'],
             [archive: signedJavadoc, classifier: 'javadoc', extension: 'jar.asc'],
-            [archive: signedJar,     classifier: null,      extension: 'jar.asc']
+            [archive: signedJar, classifier: null, extension: 'jar.asc']
     ]
 }
 
 // extract pom signature
 def getPomSignature = {
-    return project.tasks.signPom.signatureFiles.collect{it}[0]
+    return project.tasks.signPom.signatureFiles.collect { it }[0]
 }
 
 publishing {
     publications {
         gpgJars(MavenPublication) {
-            getSignatureFiles().each {signature ->
-                artifact (signature.archive) {
+            getSignatureFiles().each { signature ->
+                artifact(signature.archive) {
                     classifier = signature.classifier
-                    extension  = signature.extension
+                    extension = signature.extension
                 }
             }
         }
         if (project.ext.pomFile.exists()) {
             gpgPom(MavenPublication) {
-                artifact (getPomSignature()) {
+                artifact(getPomSignature()) {
                     classifier = null
-                    extension  = 'pom.asc'
+                    extension = 'pom.asc'
                 }
             }
         }
-		
-		mavenCustom(MavenPublication) {
+
+        mavenCustom(MavenPublication) {
             from components.java
-			
-			artifact sourceJar {
-				classifier "sources"
-			}
-			
-			artifact javadocJar {
-				classifier "javadoc"
-			}
-			
+
+            artifact sourceJar {
+                classifier "sources"
+            }
+
+            artifact javadocJar {
+                classifier "javadoc"
+            }
+
             pom.withXml {
                 asNode().children().last() + {
                     resolveStrategy = Closure.DELEGATE_FIRST
                     name 'jappy-framework'
                     packaging 'jar'
-		    description 'jappy-framework'
+                    description 'jappy-framework'
                     url 'https://github.com/jarsj/jappy-framework'
                     scm {
                         url 'scm:git@github.com:jarsj/jappy-framework.git'
@@ -186,25 +188,25 @@ publishing {
             }
         }
     }
-	model {
-		if(isMvnCentral=="true") {
-			tasks.generatePomFileForMavenCustomPublication {
-				destination = pomFilePath
-			}
-		}
-	}
-	
+    model {
+        if (isMvnCentral == "true") {
+            tasks.generatePomFileForMavenCustomPublication {
+                destination = pomFilePath
+            }
+        }
+    }
+
     repositories {
-		if (project.ext.pomFile.exists() && isMvnCentral=="true") {
-			maven {
-				url 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
-				credentials {
-					username = sonatypeUsername
-					password = sonatypePassword
-				}
-			}
-		} else {
-			mavenLocal()
-		}
-	}
+        if (project.ext.pomFile.exists() && isMvnCentral == "true") {
+            maven {
+                url 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
+                credentials {
+                    username = sonatypeUsername
+                    password = sonatypePassword
+                }
+            }
+        } else {
+            mavenLocal()
+        }
+    }
 }

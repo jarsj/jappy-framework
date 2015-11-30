@@ -13,6 +13,9 @@ import java.util.Formatter;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.lang.StringUtils;
 import org.json.JSONArray;
 
 import com.crispy.db.DB;
@@ -151,5 +154,25 @@ public class Utils {
 	        formatter.format("%02x", b);
 	    }
 	    return formatter.toString();
+	}
+	
+	public static boolean matches(HttpServletRequest req, String path) {
+		String pathComps[] = StringUtils.split(path, '/');
+		String reqComps[] = StringUtils.split(StringUtils.join(new String[]{req.getServletPath(), "/", req.getPathInfo()}, '/'), '/');
+		
+		if (pathComps.length != reqComps.length)
+			return false;
+		
+		for (int p = 0; p < pathComps.length; p++) {
+			if (pathComps[p].startsWith(":")) {
+				if (!StringUtils.isNumeric(reqComps[p]))
+					return false;
+			} else {
+				if (!pathComps[p].equals(reqComps[p])) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 }
