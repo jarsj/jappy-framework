@@ -31,12 +31,14 @@ public class Server {
 		@Override
 		public void contextInitialized(ServletContextEvent sce) {
 			super.contextInitialized(sce);
+
 		}
 	}
 	
 	private Tomcat tomcat;
 	private String baseDir;
 	private List<Class<? extends HttpServlet>> mServlets;
+	private List<HttpServlet> mServletObjects;
 	private String welcomeFile;
 	private HashMap<Class<? extends HttpServlet>, HashMap<String, String>> mInitParams;
 	
@@ -47,6 +49,7 @@ public class Server {
 			tomcat.getConnector().setProperty("address", ip);
 		}
 		mServlets = new ArrayList<Class<? extends HttpServlet>>();
+		mServletObjects = new ArrayList<>();
 		mInitParams = new HashMap<Class<? extends HttpServlet>, HashMap<String, String>>();
 	}
 	
@@ -60,6 +63,10 @@ public class Server {
 		
 	public void addServlet(Class<? extends HttpServlet> servletClass) {
 		mServlets.add(servletClass);
+	}
+
+	public void addServlet(HttpServlet servlet) {
+		mServletObjects.add(servlet);
 	}
 
 	public void addServlet(Class<? extends HttpServlet> servletClass, Map<String, String> initParams) {
@@ -86,7 +93,7 @@ public class Server {
         Tomcat.addServlet(ctx, "default", new DefaultServlet());
                 
         ctx.addServletMapping("/", "default");
-                        
+
         for (Class<? extends HttpServlet> servlet : mServlets) {
         	WebServlet annotation = servlet.getAnnotation(WebServlet.class);
         	Wrapper wrapper = Tomcat.addServlet(ctx, servlet.getSimpleName(), servlet.newInstance());
@@ -103,9 +110,21 @@ public class Server {
         	wrapper.setLoadOnStartup(annotation.loadOnStartup());
         	for (String url : annotation.urlPatterns()) {
         		ctx.addServletMapping(url, servlet.getSimpleName());
-        		
         	}
         }
+		for (HttpServlet servlet : mServletObjects) {
+			WebServlet annotation = servlet.getClass().getAnnotation(WebServlet.class);
+			Wrapper wrapper = Tomcat.addServlet(ctx, servlet.getClass().getSimpleName(), servlet);
+			if (servlet.getClass().getAnnotation(MultipartConfig.class) != null) {
+				MultipartConfigElement config = new MultipartConfigElement("/tmp");
+				wrapper.setMultipartConfigElement(config);
+			}
+			wrapper.setLoadOnStartup(annotation.loadOnStartup());
+			for (String url : annotation.urlPatterns()) {
+				ctx.addServletMapping(url, servlet.getClass().getSimpleName());
+			}
+		}
+
         Http11NioProtocol protocol = (Http11NioProtocol) tomcat.getConnector().getProtocolHandler();
 		tomcat.start();
 		tomcat.getServer().await();

@@ -1656,7 +1656,7 @@ public class Table {
 
         static WhereExp operator(String table, WhereOp op, String column, Object value) {
             WhereExp where = new WhereExp();
-            where.exp = table + ".`" + column + "`" + op.sqlOp() + "?";
+            where.exp = "`" + table + "`.`" + column + "`" + op.sqlOp() + "?";
             where.values = new Object[1];
             where.values[0] = value;
             return where;

@@ -336,8 +336,16 @@ public class Row implements IJSONConvertible {
     }
 
     public LocalDate columnAsLocalDate(String table, String name) {
-        java.sql.Date sqlDate = (java.sql.Date) column(table, name);
-        return sqlDate.toLocalDate();
+        Object o = column(table, name);
+        if (o instanceof java.sql.Date) {
+            java.sql.Date sqlDate = (java.sql.Date) o;
+            return sqlDate.toLocalDate();
+        }
+        else if (o instanceof java.sql.Timestamp) {
+            java.sql.Timestamp sqlTimestamp = (Timestamp) o;
+            return sqlTimestamp.toLocalDateTime().toLocalDate();
+        }
+        return null;
     }
 
     public LocalDate columnAsLocalDate(String name) {

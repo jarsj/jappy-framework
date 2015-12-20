@@ -33,7 +33,7 @@ public class Analytics {
      *
      * @param s3Path
      */
-    public static void init(String s3Path, String cachePath, String uniqueId) {
+    public static void init(String s3Path, String cachePath, String uniqueId, boolean hourly) {
         if (S3_PATH != null)
             throw new IllegalStateException("Analytics has already been initialized");
         S3_PATH = s3Path;
@@ -53,8 +53,16 @@ public class Analytics {
         }
 
         mLogger = Log.get("analytics");
-        mLogger.appender(Appender.create().s3(S3_PATH, UNIQUE_ID).folder(CACHE_PATH).level(Level.INFO).size
-                (LOG_FILE_SIZE).hourly().pattern("%m%n"));
+
+        Appender app = Appender.create().s3(S3_PATH, UNIQUE_ID)
+                .folder(CACHE_PATH)
+                .level(Level.INFO)
+                .size(LOG_FILE_SIZE)
+                .pattern("%m%n");
+        if (hourly)
+            app.hourly();
+
+        mLogger.appender(app);
 
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             @Override

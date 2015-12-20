@@ -46,9 +46,20 @@ public class Servlet extends HttpServlet {
      * @return
      */
     static Object paramAsObject(String s, ParamType p) {
-        if (s == null) return null;
-        if (p == ParamType.DOUBLE) return Double.parseDouble(s);
-        if (p == ParamType.LONG) return Long.parseLong(s);
+        if (p == ParamType.LONG) {
+            try {
+                return Long.parseLong(s);
+            } catch (Exception e) {
+                return 0;
+            }
+        }
+        if (p == ParamType.DOUBLE) {
+            try {
+                return Double.parseDouble(s);
+            } catch (Exception e) {
+                return 0;
+            }
+        }
         return s;
     }
 
@@ -164,6 +175,8 @@ public class Servlet extends HttpServlet {
                         resp.getWriter().flush();
                     }
                 } catch (Exception e) {
+                    System.out.println(args);
+                    e.printStackTrace();
                     throw new ServletException(e);
                 }
 
@@ -190,8 +203,19 @@ public class Servlet extends HttpServlet {
         int[] argLocationInPath;
 
         MethodSpec(Method m) {
-            GetMethod annt = m.getAnnotation(GetMethod.class);
-            String path = annt.path();
+            String path = null;
+            {
+                GetMethod annt = m.getAnnotation(GetMethod.class);
+                if (annt != null) {
+                    path = annt.path();
+                }
+            }
+            {
+                PostMethod annt = m.getAnnotation(PostMethod.class);
+                if (annt != null) {
+                    path = annt.path();
+                }
+            }
 
             pathComponents = StringUtils.split(path, '/');
 
@@ -227,13 +251,18 @@ public class Servlet extends HttpServlet {
                     argTypes[i] = ParamType.RESPONSE;
                     args[i] = null;
                     argLocationInPath[i] = -1;
+                } else if (type.equals(File.class)) {
+                    argTypes[i] = ParamType.FILE;
+                    args[i] = annotation.value();
+                    argLocationInPath[i] = -1;
                 }
             }
         }
 
         boolean matches(String[] comps) {
             if (pathComponents == null || pathComponents.length == 0) return (comps == null || comps.length == 0);
-
+            if (comps == null)
+                return false;
             if (pathComponents.length != comps.length)
                 return false;
 

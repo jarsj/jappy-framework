@@ -29,7 +29,7 @@ public class CrispySMTPAppender extends SMTPAppender {
         		mSubjectIndex.put(subjectStr, nowTime);
         		super.sendBuffer(cb, lastEventObject);
         	} else {
-        		Mail.send("server@redhotcasino.in", "harsh@crispygam.es", "SMTP Appender Crashed", "SMTP Appender has crashed \n" + mSubjectIndex.toString());
+                System.out.println("SMTP ERROR CAN NOT SEND EMAIL. BUFFER IS FULL");
         	}
         }
 	}

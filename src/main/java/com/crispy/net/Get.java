@@ -94,6 +94,10 @@ public class Get {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpGet get = createGet();
             try (CloseableHttpResponse response = client.execute(get)) {
+                if (response.getStatusLine().getStatusCode() != 200) {
+                    EntityUtils.consume(response.getEntity());
+                    return null;
+                }
                 HttpEntity entity = response.getEntity();
                 if (entity != null) {
                     return EntityUtils.toString(entity);
@@ -109,6 +113,10 @@ public class Get {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpGet get = createGet();
             try (CloseableHttpResponse response = client.execute(get)) {
+                if (response.getStatusLine().getStatusCode() != 200) {
+                    EntityUtils.consume(response.getEntity());
+                    return null;
+                }
                 HttpEntity entity = response.getEntity();
                 if (entity == null) return null;
                 return EntityUtils.toByteArray(entity);
@@ -123,11 +131,16 @@ public class Get {
         data.forEach((k, v) -> {
             params.add(new BasicNameValuePair(k, v));
         });
-        HttpGet get = new HttpGet(url + "?" + URLEncodedUtils.format(params, "UTF-8"));
+        String separator = "?";
+        if (url.contains("?")) {
+            if (url.endsWith("?")) separator = "";
+            separator = "&";
+        }
+        HttpGet get = new HttpGet(url + separator + URLEncodedUtils.format(params, "UTF-8"));
         if (timeout != -1) {
             RequestConfig requestConfig = RequestConfig.custom()
-                    .setSocketTimeout(timeout)
-                    .setConnectTimeout(timeout)
+                    .setSocketTimeout(timeout * 1000)
+                    .setConnectTimeout(timeout * 1000)
                     .build();
             get.setConfig(requestConfig);
         }

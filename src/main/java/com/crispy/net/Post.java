@@ -119,6 +119,10 @@ public class Post {
             });
 
             try (CloseableHttpResponse response = client.execute(post)) {
+                if (response.getStatusLine().getStatusCode() != 200) {
+                    EntityUtils.consume(response.getEntity());
+                    return null;
+                }
                 HttpEntity entity = response.getEntity();
                 if (entity != null) {
                     return EntityUtils.toString(entity);

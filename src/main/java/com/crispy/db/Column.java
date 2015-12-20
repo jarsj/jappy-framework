@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -378,10 +379,13 @@ public class Column {
 					return new Timestamp(((Calendar) value).getTimeInMillis());
 				if (value instanceof Timestamp)
 					return value;
+				if (value instanceof Instant) {
+					return Timestamp.from((Instant) value);
+				}
 				if (value instanceof Long)
 					return new Timestamp((Long) value);
 				if (value instanceof LocalDateTime)
-					return value;
+					return Timestamp.valueOf((LocalDateTime) value);
 				throw new IllegalArgumentException("Value should be of type Timestamp");
 			}
 			if (type.equals("INT")) {

@@ -11,14 +11,14 @@
  * 	signing.secretKeyRingFile=
  **/
 
-['signing', 'java', 'eclipse', 'jetty', 'maven-publish'].each {
+['signing', 'java', 'eclipse', 'maven-publish'].each {
     apply plugin: it
 }
 
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '3.92'
+version = '4.1'
 
 if (hasProperty("mvncentral")) {
     isMvnCentral = mvncentral

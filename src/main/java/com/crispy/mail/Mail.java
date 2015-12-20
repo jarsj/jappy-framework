@@ -1,10 +1,9 @@
 package com.crispy.mail;
 
+import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.io.IOException;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -25,126 +24,227 @@ import org.json.JSONObject;
 
 /**
  * Mail component.
- * 
+ *
  * @author harsh
  */
 public class Mail {
-	private static Properties props;
-	private static String username;
-	private static String password;
 
-	private static ScheduledExecutorService background;
-	private static ConcurrentHashMap<String, LinkedBlockingQueue<String>> queue;
+    private static int maxMessagesPerMinute = 600;
+    private static ScheduledExecutorService background;
+    private static ConcurrentHashMap<String, Mail> sharedInstances;
+    private static String defaultCredentialsFile;
+    private static LinkedBlockingQueue<SendEmailRunnable> queue;
 
-	public static void init(String credentialsFile) throws Exception {
-		Properties cProps = new Properties();
-		cProps.load(new FileReader(credentialsFile));
+    private static final Runnable sendEmailRunnable = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                List<SendEmailRunnable> tasks = new ArrayList<>();
+                queue.drainTo(tasks, maxMessagesPerMinute / 6);
+                for (SendEmailRunnable task : tasks) {
+                    task.run();
+                }
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }
+    };
 
-		props = new Properties();
-		props.put("mail.smtp.host", cProps.getProperty("smtpServer", "email-smtp.us-east-1.amazonaws.com"));
-		props.put("mail.smtp.starttls.enable", "true");
-		props.put("mail.smtp.auth", "true");
-		props.put("mail.smtp.port", Integer.parseInt(cProps.getProperty("smtpPort", "587")));
+    static {
+        background = Executors.newSingleThreadScheduledExecutor();
+        sharedInstances = new ConcurrentHashMap<>();
+        queue = new LinkedBlockingQueue<>();
+        background.scheduleAtFixedRate(sendEmailRunnable, 0, 10, TimeUnit.SECONDS);
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                background.shutdown();
+                try {
+                    background.awaitTermination(2, TimeUnit.MINUTES);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }));
+    }
 
-		username = cProps.getProperty("smtpUsername");
-		password = cProps.getProperty("smtpPassword");
-		
-		if (username == null || password == null) 
-			throw new IllegalStateException("Define smtpUsername or password");
+    private Properties props;
+    private Authenticator auth;
+    private String from;
+    private String[] to;
+    private String subject;
+    private String body;
+    private boolean html;
 
-		background = Executors.newSingleThreadScheduledExecutor();
-		queue = new ConcurrentHashMap<String, LinkedBlockingQueue<String>>();
-		background.scheduleAtFixedRate(sendEmailRunnable, 0, 1, TimeUnit.MINUTES);
-	}
+    private Mail() {
+        html = false;
+    }
 
-	public static void send(String from, String to, String subject, String body) {
-		try {
-			internalSend(new Authenticator() {
-				protected PasswordAuthentication getPasswordAuthentication() {
-					return new PasswordAuthentication(username, password);
-				}
-			}, from, to, subject, body);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    private Mail(Mail m) {
+        auth = m.auth;
+        props = m.props;
+        from = m.from;
+        if (m.to != null) {
+            to = new String[m.to.length];
+            System.arraycopy(m.to, 0, to, 0, m.to.length);
+        }
+        subject = m.subject;
+        body = m.body;
+        html = m.html;
+    }
 
-	public static void queue(String to, String subject, String body) {
-		LinkedBlockingQueue<String> q = queue.get(to);
-		if (q == null) {
-			q = new LinkedBlockingQueue<String>();
-			queue.put(to, q);
-		}
-		try {
-			q.add(new JSONObject().put("to", to).put("subject", subject).put("body", body).toString());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    public static void setDefaultCredentialsFile(String file) {
+        defaultCredentialsFile = file;
+    }
 
-	private static void internalSend(Authenticator auth, String from, String to, String subject, String body) throws AddressException, MessagingException {
-		Session session = Session.getDefaultInstance(props, auth);
-		MimeMessage message = new MimeMessage(session);
-		message.setFrom(new InternetAddress(from));
-		message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
-		message.setSubject(subject);
-		message.setText(body);
-		Transport.send(message);
+    public static void setMaxMessagesPerMinute(int m) {
+        if (m < 1) throw new IllegalArgumentException("Can't set max messages per minute to < 1");
+        maxMessagesPerMinute = m;
+    }
 
-	}
+    public static Mail get(String type) {
+        return sharedInstances.computeIfAbsent(type, k -> {
+            Mail m = new Mail();
+            if (defaultCredentialsFile != null) {
+                try {
+                    m.setCredentials(defaultCredentialsFile);
+                } catch (IOException e) {
+                    return null;
+                }
+            }
+            return m;
+        });
+    }
 
-	private static final Runnable sendEmailRunnable = new Runnable() {
+    public Mail setCredentials(String file) throws IOException {
+        Properties cProps = new Properties();
+        cProps.load(new FileReader(file));
 
-		@Override
-		public void run() {
-			try {
+        props = new Properties();
+        props.put("mail.smtp.host", cProps.getProperty("smtpServer", "email-smtp.us-east-1.amazonaws.com"));
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.port", Integer.parseInt(cProps.getProperty("smtpPort", "587")));
 
-				Authenticator auth = new Authenticator() {
-					protected PasswordAuthentication getPasswordAuthentication() {
-						return new PasswordAuthentication(username, password);
-					}
-				};
+        String username = cProps.getProperty("smtpUsername");
+        String password = cProps.getProperty("smtpPassword");
 
-				for (Map.Entry<String, LinkedBlockingQueue<String>> entry : queue.entrySet()) {
-					String to = entry.getKey();
-					LinkedBlockingQueue<String> q = entry.getValue();
+        if (username == null || password == null)
+            throw new IllegalStateException("Define smtpUsername or password");
 
-					ArrayList<String> t = new ArrayList<String>();
-					q.drainTo(t);
+        auth = new Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(username, password);
+            }
+        };
 
-					HashMap<String, StringBuilder> bySubjects = new HashMap<String, StringBuilder>();
+        return this;
+    }
 
-					for (String mail : t) {
-						JSONObject o = new JSONObject(mail);
-						StringBuilder body = bySubjects.get(o.getString("subject"));
-						if (body == null) {
-							body = new StringBuilder();
-							bySubjects.put(o.getString("subject"), body);
-						}
-						body.append("\n\n");
-						body.append(o.getString("body"));
-					}
+    public Mail withFrom(String from) {
+        Mail m = new Mail(this);
+        m.from = from;
+        return m;
+    }
 
-					for (Map.Entry<String, StringBuilder> entry2 : bySubjects.entrySet()) {
-						internalSend(auth, "harsh@zopte.com", to, entry2.getKey(), entry2.getValue().toString());
-					}
-				}
-			} catch (Throwable t) {
-				t.printStackTrace();
-			}
-		}
-	};
+    public Mail withTo(String... to) {
+        Mail m = new Mail(this);
+        m.to = to;
+        return m;
+    }
 
-	public void shutdown() {
-		if (background != null) {
-			background.shutdown();
-		}
-	}
+    public Mail withSubject(String subject) {
+        Mail m = new Mail(this);
+        m.subject = subject;
+        return m;
+    }
 
-	public void shutdownNow() {
-		if (background != null) {
-			background.shutdownNow();
-		}
-	}
+    public Mail enableHtml() {
+        html = true;
+        return this;
+    }
 
+    public Mail withBody(String body) {
+        Mail m = new Mail(this);
+        m.body = body;
+        return m;
+    }
+
+    public void send() {
+        send(from, subject, body, to);
+    }
+
+    public void sendTo(String... to) {
+        send(from, subject, body, to);
+    }
+
+    public void sendFrom(String from) {
+        send(from, subject, body, to);
+    }
+
+    public void send(String subject, String body) {
+        send(from, subject, body, to);
+    }
+
+    public void sendToWithSubject(String subject, String ... to) {
+        send(from, subject, body, to);
+    }
+
+    public void sendToWithSubjectAndBody(String subject, String body, String ... to) {
+        send(from, subject, body, to);
+    }
+
+    public void send(String from, String subject, String body, String... to) {
+        if (auth == null || props == null)
+            throw new IllegalStateException("Mail doesn't have credentials");
+        if (from == null)
+            throw new IllegalStateException("Can't send email without a from");
+        if (to == null || to.length == 0)
+            throw new IllegalStateException("Can't send email without a destination");
+        if (subject == null)
+            subject = "";
+        if (body == null)
+            body = "";
+
+        SendEmailRunnable ser = new SendEmailRunnable();
+        ser.auth = auth;
+        ser.props = props;
+        ser.from = from;
+        ser.subject = subject;
+        ser.body = body;
+        ser.tos = to;
+        queue.offer(ser);
+    }
+
+    private class SendEmailRunnable implements Runnable {
+        Properties props;
+        Authenticator auth;
+        String from;
+        String[] tos;
+        String subject;
+        String body;
+
+
+        @Override
+        public void run() {
+            try {
+                Session session = Session.getDefaultInstance(props, auth);
+                MimeMessage message = new MimeMessage(session);
+                message.setFrom(new InternetAddress(from));
+                for (String to : tos) {
+                    message.addRecipient(Message.RecipientType.TO, new InternetAddress(to));
+                }
+                message.setSubject(subject);
+                if (html) {
+                    message.setContent(body, "text/html; charset=utf-8");
+                } else {
+                    message.setText(body);
+                }
+
+                Transport.send(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
