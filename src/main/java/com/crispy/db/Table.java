@@ -13,10 +13,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Part;
-
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -97,15 +93,6 @@ public class Table {
             temp.add("`" + s + "`");
         }
         return StringUtils.join(temp, ',');
-    }
-
-    private static String getFileName(final Part part) {
-        for (String content : part.getHeader("content-disposition").split(";")) {
-            if (content.trim().startsWith("filename")) {
-                return content.substring(content.indexOf('=') + 1).trim().replace("\"", "");
-            }
-        }
-        return null;
     }
 
     public Table transform(RowTransform transform) {
@@ -959,7 +946,7 @@ public class Table {
         return this;
     }
 
-    public Table in(String column, Object value[]) throws Exception {
+    public Table in(String column, Object value[]) {
         Metadata m = DB.getMetadata(name);
         Column c = Column.findByName(m.columns, column);
         if (c == null) {
@@ -973,7 +960,7 @@ public class Table {
         return this;
     }
 
-    public Table or(String column, Object value[]) throws Exception {
+    public Table or(String column, Object value[]) {
         Metadata m = DB.getMetadata(name);
         Column c = Column.findByName(m.columns, column);
         if (c == null) {
@@ -1300,208 +1287,6 @@ public class Table {
         return this;
     }
 
-    /**
-     * Perform HTTP Get on this table.
-     * <p>
-     * path is angular path string of the form /users/:id?param1,param2,param3.
-     * Any parameter that matches a column name is applied as a filter. Special
-     * columns _start, _total are applied for pagination
-     * <p>
-     * param1/2/3 are compulsary params. They must match a column name.
-     *
-     * @param req
-     * @param resp
-     * @param path
-     * @return
-     * @throws Exception
-     */
-    public boolean doGet(HttpServletRequest req, HttpServletResponse resp, String path) {
-        try {
-            if (path == null)
-                throw new IllegalArgumentException("Null path");
-
-            ArrayList<Table> nJoins = new ArrayList<Table>(joins);
-            nJoins.add(this);
-
-            String fullReqPath = req.getServletPath();
-            if (req.getPathInfo() != null)
-                fullReqPath += req.getPathInfo();
-
-            ArrayList<String> compulsaryParams = new ArrayList<String>();
-            ;
-            if (path.contains("?")) {
-                compulsaryParams.addAll(Arrays.asList(StringUtils.split(path.substring(path.indexOf('?') + 1), ",")));
-                path = path.substring(0, path.indexOf('?'));
-            }
-            String reqComps[] = StringUtils.split(fullReqPath, "/");
-            String pathComps[] = StringUtils.split(path, "/");
-
-            Metadata m = DB.getMetadata(name);
-            if (m == null)
-                throw new IllegalStateException("No table exists by name=" + name);
-
-            int primaryColumns = 0;
-
-            boolean dirty = false;
-            for (int i = 0; i < reqComps.length; i++) {
-                if (pathComps[i].startsWith(":")) {
-                    String column = pathComps[i].substring(1);
-                    if (m.isPrimaryColumn(column)) {
-                        primaryColumns++;
-                    }
-                    boolean validColumn = false;
-                    for (Table joinTable : nJoins) {
-                        Metadata jM = DB.getMetadata(joinTable.name);
-                        if (jM.containsColumn(column)) {
-                            joinTable.where(column, reqComps[i]);
-                            validColumn = true;
-                        }
-                    }
-                    if (!validColumn) {
-                        dirty = true;
-                    }
-                } else if (!pathComps[i].equals(reqComps[i])) {
-                    return false;
-                }
-            }
-
-            if (dirty) {
-                throw new IllegalStateException("Illegal path " + path);
-            }
-
-            // Apply compulsary params
-            for (String cparam : compulsaryParams) {
-                if (m.isPrimaryColumn(cparam))
-                    primaryColumns++;
-                for (Table joinTable : nJoins) {
-                    Metadata jM = DB.getMetadata(joinTable.name);
-                    if (jM.containsColumn(cparam)) {
-                        joinTable.where(cparam, req.getParameter(cparam));
-                    }
-                }
-            }
-
-            // Parameters
-            Enumeration<String> names = req.getParameterNames();
-            while (names.hasMoreElements()) {
-                String column = names.nextElement();
-                // Compulsary params have already been taken care of
-                if (compulsaryParams.contains(column))
-                    continue;
-
-                if (m.isPrimaryColumn(column)) {
-                    primaryColumns++;
-                }
-
-                // System Columns.
-                if (column.equals("_start")) {
-                    start(Integer.parseInt(req.getParameter(column)));
-                } else if (column.equals("_total")) {
-                    limit(Integer.parseInt(req.getParameter(column)));
-                } else {
-                    for (Table joinTable : joins) {
-                        Metadata jM = DB.getMetadata(joinTable.name);
-                        if (jM.containsColumn(column)) {
-                            joinTable.where(column, req.getParameter(column));
-                        }
-                    }
-                }
-            }
-
-            Object ret = null;
-            if (primaryColumns >= m.primary.columns.size()) {
-                Row row = row();
-                if (row != null) {
-                    ret = transform.transform(Row.rowToJSON(row));
-                }
-            } else {
-                List<Row> rows = rows();
-                if (rows != null) {
-                    ret = Row.rowsToJSON(rows, transform);
-                } else {
-                    ret = new JSONArray();
-                }
-            }
-            if (ret != null) {
-                resp.getWriter().write(ret.toString());
-                resp.getWriter().flush();
-            } else {
-                resp.setStatus(404);
-            }
-            return true;
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    public Table where(HttpServletRequest req, JSONObject buffer,
-                       String columnName,
-                       String paramColumnName) {
-        try {
-            commandFromRequest(true, paramColumnName, req, columnName, buffer);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return this;
-    }
-
-    public Table value(HttpServletRequest req, JSONObject buffer,
-                       String columnName, String paramColumnName) {
-        try {
-            commandFromRequest(false, paramColumnName, req, columnName, buffer);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return this;
-    }
-
-    private boolean commandFromRequest(boolean where, String paramColumnName, HttpServletRequest req, String realColumnName, JSONObject buffer)
-            throws Exception {
-        if (realColumnName == null)
-            realColumnName = paramColumnName;
-        boolean isMultipart = ((req.getContentType() != null) && (req.getContentType().toLowerCase().indexOf("multipart/form-data") > -1));
-        boolean isJSON = (buffer != null);
-        if (isMultipart) {
-            Part part = req.getPart(paramColumnName);
-            if (part == null)
-                return false;
-            String fileName = getFileName(part);
-            if (fileName == null) {
-                if (where)
-                    where(realColumnName, IOUtils.toString(part.getInputStream()));
-                else
-                    value(realColumnName, IOUtils.toString(part.getInputStream()));
-            } else {
-                File temp = File.createTempFile("tmp", "." + FilenameUtils.getExtension(fileName));
-                part.write(temp.getAbsolutePath());
-                if (where)
-                    where(realColumnName, temp);
-                else
-                    value(realColumnName, temp);
-            }
-            return true;
-        } else if (isJSON) {
-            String paramValue = buffer.optString(paramColumnName, null);
-            if (paramValue == null) {
-                return false;
-            }
-            if (where)
-                where(realColumnName, paramValue);
-            else
-                value(realColumnName, paramValue);
-            return true;
-        } else {
-            String paramValue = req.getParameter(paramColumnName);
-            if (paramValue == null)
-                return false;
-            if (where)
-                where(realColumnName, paramValue);
-            else
-                value(realColumnName, paramValue);
-            return true;
-        }
-    }
-
     private void sanityCheck() {
         Metadata m = DB.getMetadata(name);
         if (m == null)
@@ -1526,78 +1311,6 @@ public class Table {
         validators.put(column, f);
         return this;
     }
-
-    /**
-     * Create or update a row extracting params from the given req/resp.
-     *
-     * @param req
-     * @param resp
-     * @return
-     */
-    public Table doPost(HttpServletRequest req, HttpServletResponse resp) {
-        sanityCheck();
-        try {
-            // Sanity check
-            Metadata m = DB.getMetadata(name);
-
-            JSONObject buffer = null;
-            if ((req.getContentType() != null) && (req.getContentType().toLowerCase().indexOf("application/json") > -1)) {
-                buffer = new JSONObject(IOUtils.toString(req.getReader()));
-            }
-
-            // Table primaryRow = Table.get(name);
-
-            // First add a row to the this table
-            for (String column : m.columnNames()) {
-                // Column c = m.getColumn(column);
-                commandFromRequest(false, column, req, null, buffer);
-                // if (m.isPrimaryColumn(c.name))
-                // primaryRow.commandFromRequest(true, column, req, null, buffer);
-            }
-
-            overwriteColumns = new ArrayList<String>(columnNames);
-            // Add
-            add();
-
-            // The row that was added
-            Row referenceRow = row();
-
-            for (int i = 0; i < joins.size(); i++) {
-                Table joinTable = joins.get(i);
-                Metadata joinMetadata = DB.getMetadata(joinTable.name);
-                Constraint joinConstraint = Constraint.to(joinMetadata.constraints, name);
-                if (joinConstraint == null) {
-                    continue;
-                }
-
-                joinTable.value(joinConstraint.sourceColumn, referenceRow.column(joinConstraint.destColumn));
-                joinTable.overwrite(joinConstraint.sourceColumn);
-                boolean createJoinTableEntry = false;
-                for (Column column : joinMetadata.columns) {
-                    if (column.isAutoIncrement())
-                        continue;
-                    if (column.name.equals(joinConstraint.sourceColumn))
-                        continue;
-                    if (joinTable.commandFromRequest(false, column.name, req, null, buffer)) {
-                        createJoinTableEntry = true;
-                        joinTable.overwrite(column.name);
-                    }
-                }
-                if (createJoinTableEntry) {
-                    joinTable.add();
-                }
-            }
-
-            return this;
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    public void doDelete(HttpServletRequest req, HttpServletResponse resp) {
-
-    }
-
 
     private enum JoinType {
         LEFT, RIGHT, NORMAL;

@@ -171,8 +171,13 @@ public class Servlet extends HttpServlet {
                 try {
                     Object out = spec.method.invoke(this, args);
                     if (out != null) {
-                        resp.getWriter().write(out.toString());
-                        resp.getWriter().flush();
+                        if (out instanceof byte[]) {
+                            resp.getOutputStream().write((byte[]) out);
+                            resp.getOutputStream().flush();
+                        } else {
+                            resp.getWriter().write(out.toString());
+                            resp.getWriter().flush();
+                        }
                     }
                 } catch (Exception e) {
                     System.out.println(args);
