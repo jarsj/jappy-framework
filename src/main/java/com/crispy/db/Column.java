@@ -288,7 +288,17 @@ public class Column {
 					} else if (value instanceof URL) {
 						return Image.uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value).getPath());
 					} else {
-						return value.toString();
+						String c = value.toString();
+						try {
+							File f = new File(c);
+							if (f.exists()) {
+								return f.getAbsolutePath();
+							} else {
+								return null;
+							}
+						} catch (Throwable t) {
+							return null;
+						}
 					}
 				} else if (comment_s3 != null) {
 					String s3Bucket = comment_s3;

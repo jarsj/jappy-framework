@@ -191,11 +191,11 @@ public class Log {
 		logger.error(message);
 	}
 
-	public void error(String format, Object message) {
+	public void errorFormat(String format, Object message) {
 		logger.error(format, message);
 	}
 
-	public void error(String format, Object message1, Object message2) {
+	public void errorFormat(String format, Object message1, Object message2) {
 		logger.error(format, message1, message2);
 	}
 

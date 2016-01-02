@@ -68,13 +68,18 @@ public class Image {
 			String fileExtension = FilenameUtils.getExtension(raw.getName()).toLowerCase();
 			ProcessBuilder pb;
 			if (fileExtension.equals("mp4") || fileExtension.equals("webm")) {
-				pb = new ProcessBuilder("/usr/bin/ffmpeg", "-i", raw.getAbsolutePath(), "-vf", "thumbnail,scale=" + width + ":height", "-frames:v", "1",
+				pb = new ProcessBuilder("/usr/bin/ffmpeg", "-i", raw.getAbsolutePath(), "-vf", "thumbnail,scale=" +
+						width + ":" + height, "-frames:v", "1",
 						output.getAbsolutePath());
 			} else if (fileExtension.equals("psd")) {
-				pb = new ProcessBuilder("/usr/bin/convert", raw.getAbsolutePath() + "[0]", "-auto-orient", "-strip", "-thumbnail", width + "x"
+				pb = new ProcessBuilder("/usr/local/bin/convert", raw.getAbsolutePath() + "[0]", "-auto-orient",
+                        "-strip", "-thumbnail", width + "x"
 						+ height, output.getAbsolutePath());
 			} else {
-				pb = new ProcessBuilder("/usr/bin/convert", 
+                String resizeCmd = width + "x" + height + "!";
+                if (width == -1) resizeCmd = "x" + height;
+                if (height == -1) resizeCmd = width + "";
+				pb = new ProcessBuilder("/usr/local/bin/convert",
 						raw.getAbsolutePath(),// 
 						"-filter", //
 						"Lanczos",// 
@@ -85,7 +90,7 @@ public class Image {
 						"-unsharp",// 
 						"1.5x0.7+0.02",// 
 						 "-resize",// 
-						 width + "x" + height + "!",
+						 resizeCmd,
 						output.getAbsolutePath());
 			}
 			if (tmpFolder != null) {

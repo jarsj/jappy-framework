@@ -3,14 +3,19 @@ var jappyApp = angular.module('jappyApp', ['ui.router', 'ngMaterial', 'ngMessage
 jappyApp.factory('menu', function() {
     var sections = [{
         name: 'Getting Started',
-        url: 'getting-started',
+        url: 'home',
         type: 'link'
     }];
 
     sections.push({
-        name: 'Customization',
+        name: 'Documentation',
         type: 'heading',
         children: [
+            {
+                name : 'Logging',
+                url : 'log',
+                type : 'link'
+            },
             {
                 name: 'CSS',
                 type: 'toggle',
@@ -229,8 +234,14 @@ jappyApp.config(function ($stateProvider, $urlRouterProvider, $locationProvider)
         url: "/getting-started",
         templateUrl: "getting_started.html"
     });
+    $stateProvider.state('log', {
+        controller : "DefaultController",
+        url : "/logging",
+        templateUrl : "logging.html"
+    })
 });
 
 jappyApp.controller("DefaultController", function($scope) {
 
 });
+

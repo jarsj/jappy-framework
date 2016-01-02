@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
+import com.crispy.server.Params;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -163,6 +164,13 @@ public class Table {
             distincts = new TreeSet<String>();
         }
         distincts.add(column);
+        return this;
+    }
+
+    public Table values(Params params) {
+        for (String key : params.keys()) {
+            value(key, params.get(key));
+        }
         return this;
     }
 
@@ -403,6 +411,8 @@ public class Table {
         }
         return this;
     }
+
+
 
     public Table values(Object... values) {
         this.values = new ArrayList<Object>();

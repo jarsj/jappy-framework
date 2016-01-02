@@ -38,3 +38,21 @@
 .site-sidenav {
   background: #106cc8 none repeat scroll 0 0;
 }
+
+.docs-logo h1 {
+  margin : 0;
+}
+
+.docs-logo small {
+  color : #FFF;
+}
+
+a.docs-logo {
+  margin-top : 50px;
+  margin-bottom : 30px;
+}
+
+.highlight {
+  padding : 10px;
+  margin-bottom : 20px;
+}
