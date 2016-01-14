@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 
+import com.crispy.server.Params;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
@@ -37,6 +38,7 @@ public class Row implements IJSONConvertible {
     private static final Log LOG = Log.get("jappy.db");
     private HashMap<String, Object> columns;
     private HashMap<String, LinkedList<String>> columnToTableIndex;
+
     private TreeSet<String> tables;
 
     protected Row(ResultSet results) throws SQLException {
@@ -47,6 +49,7 @@ public class Row implements IJSONConvertible {
         for (int c = 0; c < meta.getColumnCount(); c++) {
             String table = meta.getTableName(c + 1);
             String column = meta.getColumnName(c + 1);
+
             if (table.length() > 0) {
                 columns.put(table + "." + column, results.getObject(c + 1));
                 tables.add(table);
@@ -134,20 +137,43 @@ public class Row implements IJSONConvertible {
         return tables.getFirst();
     }
 
+    @Deprecated
     public Object column(String name) {
         return column(getTable(name), name);
     }
 
+    public Value col(String name) {
+        return col(getTable(name), name);
+    }
+
+    @Deprecated
     public Object column(String table, String name) {
         return columns.get(table + "." + name);
     }
 
+    public Value col(String table, String name) {
+        if (table == null)
+            throw new IllegalArgumentException("No table found for column=" + name);
+        Object o = columns.get(table + "." + name);
+        return Value.create(o, DB.getMetadata(table).getColumn(name));
+    }
+
+    public Value sum(String name) {
+        return fn("SUM", name);
+    }
+
+    public Value fn(String fn, String name) {
+        return Value.create(columns.get(fn.toUpperCase() + "(`" + name + "`)"), null);
+    }
+
+    @Deprecated
     public String columnAsString(String name) {
         if (name == null)
             throw new IllegalArgumentException("Passed null argument to columnAsString argument=name");
         return columnAsString(getTable(name), name);
     }
 
+    @Deprecated
     public String columnAsString(String table, String name) {
         if (table == null)
             throw new IllegalArgumentException("Passed null argument to columnAsString argument=table");
@@ -158,14 +184,17 @@ public class Row implements IJSONConvertible {
         return (o != null) ? o.toString() : c.def;
     }
 
+    @Deprecated
     public URL columnAsUrl(String name) throws MalformedURLException {
         return columnAsUrl(getTable(name), name);
     }
 
+    @Deprecated
     public File columnAsFile(String name) {
         return columnAsFile(getTable(name), name);
     }
 
+    @Deprecated
     public File columnAsFile(String table, String name) {
         Column c = DB.getMetadata(table).getColumn(name);
         Object value = column(name);
@@ -197,6 +226,7 @@ public class Row implements IJSONConvertible {
         return null;
     }
 
+    @Deprecated
     public URL columnAsUrl(String table, String name) {
         Column c = DB.getMetadata(table).getColumn(name);
         Object value = column(name);
@@ -290,14 +320,17 @@ public class Row implements IJSONConvertible {
         return Long.parseLong(o.toString());
     }
 
+    @Deprecated
     public int columnAsInt(String name, int def) {
         return columnAsInt(getTable(name), name, def);
     }
 
+    @Deprecated
     public float columnAsFloat(String name, float def) {
         return columnAsFloat(getTable(name), name, def);
     }
 
+    @Deprecated
     public float columnAsFloat(String table, String name, float def) {
         Object o = column(table, name);
         if (o == null)

@@ -28,10 +28,19 @@ import com.crispy.log.Log;
 public class Image {
 
 	private static final Image INSTANCE = new Image();
+	private final String CONVERT_PATH;
 
 	private ScheduledExecutorService background;
 
 	private Image() {
+        if (new File("/usr/bin/convert").exists()) {
+            CONVERT_PATH = "/usr/bin/convert";
+        } else if (new File("/usr/local/bin/convert").exists()) {
+			CONVERT_PATH = "/usr/local/bin/convert";
+		} else {
+            CONVERT_PATH = "/usr/bin/convert";
+        }
+
 		background = Executors.newSingleThreadScheduledExecutor();
 		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
 			@Override
@@ -48,9 +57,9 @@ public class Image {
 		return INSTANCE;
 	}
 
-	private static final Log LOG = Log.get("resource");
+	private final Log LOG = Log.get("resource");
 
-	public static String uploadFile(String uploadFolder, InputStream input, String fileName) throws FileNotFoundException, IOException {
+	public String uploadFile(String uploadFolder, InputStream input, String fileName) throws FileNotFoundException, IOException {
 		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
 		String nextID = UUID.randomUUID().toString().toLowerCase();
 		File folder = new File(uploadFolder);
@@ -72,14 +81,14 @@ public class Image {
 						width + ":" + height, "-frames:v", "1",
 						output.getAbsolutePath());
 			} else if (fileExtension.equals("psd")) {
-				pb = new ProcessBuilder("/usr/local/bin/convert", raw.getAbsolutePath() + "[0]", "-auto-orient",
+				pb = new ProcessBuilder(CONVERT_PATH, raw.getAbsolutePath() + "[0]", "-auto-orient",
                         "-strip", "-thumbnail", width + "x"
 						+ height, output.getAbsolutePath());
 			} else {
                 String resizeCmd = width + "x" + height + "!";
                 if (width == -1) resizeCmd = "x" + height;
                 if (height == -1) resizeCmd = width + "";
-				pb = new ProcessBuilder("/usr/local/bin/convert",
+				pb = new ProcessBuilder(CONVERT_PATH,
 						raw.getAbsolutePath(),// 
 						"-filter", //
 						"Lanczos",// 
@@ -96,6 +105,8 @@ public class Image {
 			if (tmpFolder != null) {
 				pb.directory(tmpFolder);
 			}
+
+            System.out.println(pb.command().toString());
 
 			pb.redirectErrorStream(true);
 			pb.redirectOutput(Redirect.to(new File("/dev/null")));
@@ -120,7 +131,6 @@ public class Image {
 		final String parent = (s3Comps.length == 0) ? "" : (StringUtils.join(s3Comps, "/") + "/");
 
 		background.execute(new Runnable() {
-
 			@Override
 			public void run() {
 				try {
@@ -139,7 +149,7 @@ public class Image {
 		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext;
 	}
 
-	public static String uploadS3(String s3Bucket, InputStream input, String fileName) throws FileNotFoundException, IOException {
+	public String uploadS3(String s3Bucket, InputStream input, String fileName) throws FileNotFoundException, IOException {
 		String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
 		String nextID = UUID.randomUUID().toString().toLowerCase();
 		String s3Comps[] = s3Bucket.split("/");
@@ -154,7 +164,7 @@ public class Image {
 		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext;
 	}
 
-	public static File scale(File source, int width, int height) throws IOException {
+	public File scale(File source, int width, int height) throws IOException {
 		BufferedImage image = ImageIO.read(source);
 		String extension = source.getName().substring(source.getName().lastIndexOf(".") + 1);
 		File ret = internalScale(image, extension, width, height);
@@ -162,12 +172,12 @@ public class Image {
 		return ret;
 	}
 
-	public static File scale(File source, int size) throws IOException {
+	public File scale(File source, int size) throws IOException {
 		String extension = source.getPath().substring(source.getAbsolutePath().lastIndexOf(".") + 1);
 		return internalScale(ImageIO.read(source), extension, size);
 	}
 
-	private static File internalScale(BufferedImage image, String extension, int width, int height) throws IOException {
+	private File internalScale(BufferedImage image, String extension, int width, int height) throws IOException {
 		BufferedImage scaled = Scalr.resize(image, Method.ULTRA_QUALITY, Mode.FIT_EXACT, width, height);
 		File tempFile = File.createTempFile("tempScaled_", "." + extension);
 		ImageIO.write(scaled, extension, tempFile);
@@ -175,7 +185,7 @@ public class Image {
 		return tempFile;
 	}
 
-	private static File internalScale(BufferedImage image, String extension, int size) throws IOException {
+	private File internalScale(BufferedImage image, String extension, int size) throws IOException {
 		BufferedImage scaled = Scalr.resize(image, Method.ULTRA_QUALITY, size);
 		File tempFile = File.createTempFile("tempScaled_", "." + extension);
 		ImageIO.write(scaled, extension, tempFile);

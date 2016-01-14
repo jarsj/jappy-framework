@@ -86,7 +86,7 @@ public class Get {
                 return response.getStatusLine().getStatusCode();
             }
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            return 500;
         }
     }
 
@@ -105,7 +105,7 @@ public class Get {
                 return null;
             }
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            return null;
         }
     }
 
@@ -122,7 +122,7 @@ public class Get {
                 return EntityUtils.toByteArray(entity);
             }
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            return null;
         }
     }
 
@@ -151,6 +151,8 @@ public class Get {
     }
 
     public JSONObject json() {
-        return new JSONObject(response());
+        String str = response();
+        if (str == null) return null;
+        return new JSONObject(str);
     }
 }

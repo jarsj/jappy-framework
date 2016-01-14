@@ -280,13 +280,18 @@ public class Column {
 		try {
 			if (value == null)
 				return null;
+			if (value instanceof Value) {
+				return parseObject(((Value) value).asObject());
+			}
 			if (type.endsWith("TEXT") || type.startsWith("VARCHAR")) {
 				if (comment_folder != null) {
 					String uploadFolder = comment_folder;
 					if (value instanceof File) {
-						return Image.uploadFile(uploadFolder, new FileInputStream((File) value), ((File) value).getName());
+						return Image.getInstance().uploadFile(uploadFolder, new FileInputStream((File) value), (
+								(File) value).getName());
 					} else if (value instanceof URL) {
-						return Image.uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value).getPath());
+						return Image.getInstance().uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value)
+								.getPath());
 					} else {
 						String c = value.toString();
 						try {
@@ -465,7 +470,7 @@ public class Column {
 	}
 
 	public SimpleType simpleType(Metadata m) {
-		if (m.getConstraint(name) != null) {
+		if (m != null && m.getConstraint(name) != null) {
 			Constraint c = m.getConstraint(name);
 			Metadata dest = DB.getMetadata(c.destTable);
 			if (dest.getDisplay() != null) {

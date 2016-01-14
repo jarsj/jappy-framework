@@ -7,6 +7,7 @@ import org.apache.catalina.Wrapper;
 import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.coyote.http11.Http11NioProtocol;
+import org.apache.tomcat.websocket.server.Constants;
 import org.apache.tomcat.websocket.server.WsContextListener;
 
 import javax.servlet.MultipartConfigElement;
@@ -14,6 +15,9 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
+import javax.websocket.DeploymentException;
+import javax.websocket.server.ServerContainer;
+import javax.websocket.server.ServerEndpoint;
 import java.io.File;
 import java.util.*;
 
@@ -29,6 +33,8 @@ public class Server {
     private List<ServletInfo> mServletObjects;
     private String welcomeFile;
     private HashMap<Class<? extends HttpServlet>, HashMap<String, String>> mInitParams;
+    private static List<Class> websocketEndpoints = new ArrayList<>();
+
     public Server(String ip, int port) {
         tomcat = new Tomcat();
         tomcat.setPort(port);
@@ -38,6 +44,7 @@ public class Server {
         mServlets = new ArrayList<Class<? extends HttpServlet>>();
         mServletObjects = new ArrayList<>();
         mInitParams = new HashMap<Class<? extends HttpServlet>, HashMap<String, String>>();
+        websocketEndpoints = new ArrayList<>();
     }
     public Server(int port) {
         this(null, port);
@@ -53,6 +60,12 @@ public class Server {
 
     public void addServlet(Class<? extends HttpServlet> servletClass) {
         mServlets.add(servletClass);
+    }
+
+    public void addEndpoint(Class c) {
+        if (c.getAnnotation(ServerEndpoint.class) == null)
+            throw new IllegalArgumentException("Missing annotation from class");
+        websocketEndpoints.add(c);
     }
 
     public void addServlet(HttpServlet servlet, String[] urlPatterns, boolean multipart, int loadOrder) {
@@ -152,6 +165,14 @@ public class Server {
         @Override
         public void contextInitialized(ServletContextEvent sce) {
             super.contextInitialized(sce);
+            ServerContainer sc = (ServerContainer) sce.getServletContext().getAttribute(Constants.SERVER_CONTAINER_SERVLET_CONTEXT_ATTRIBUTE);
+            for (Class c : websocketEndpoints) {
+                try {
+                    sc.addEndpoint(c);
+                } catch (DeploymentException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 

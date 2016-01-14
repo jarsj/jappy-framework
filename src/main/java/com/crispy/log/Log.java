@@ -1,7 +1,10 @@
 package com.crispy.log;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URLEncoder;
 
+import org.apache.commons.io.FileUtils;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
@@ -86,6 +89,11 @@ public class Log {
 
 			if (appender.folder == null) {
 				appender.folder = "/tmp";
+			}
+			try {
+				FileUtils.forceMkdir(new File(appender.folder));
+			} catch (IOException e) {
+				throw new IllegalStateException("Can not initialize logging.", e);
 			}
 
 			policy.setParent((FileAppender) ret);

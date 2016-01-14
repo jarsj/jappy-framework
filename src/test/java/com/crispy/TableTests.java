@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.chrono.ChronoLocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
@@ -82,5 +83,24 @@ public class TableTests {
 				());
 	}
 
-	
+	@Test
+	public void testFunctions() {
+		Table.get("test").columns(Column.bigInteger("id", true),
+				Column.text("name", 100),
+				Column.bigInteger("score")).create();
+
+		for (int x = 0; x < 5; x++) {
+			String name = "user_" + x;
+			for (int i = 0; i < 100; i++) {
+				Table.get("test").columns("name", "score").values(name, i).add();
+			}
+		}
+
+		List<Row> rows = Table.get("test").columns("name").groupBy("name").sum("score").rows();
+		assertEquals(5, rows.size());
+		for (int i = 0; i < 5; i++) {
+			Row r = rows.get(i);
+			assertEquals(4950, r.sum("score").asLong());
+		}
+	}
 }

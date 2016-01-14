@@ -2,12 +2,14 @@ package com.crispy.net;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.FileEntity;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
@@ -28,15 +30,21 @@ public class Post {
     private HashMap<String, String> headers;
     private HashMap<String, String> data;
     private HashMap<String, String> params;
+    private HashMap<String, File> files;
+    private HashMap<String, ContentType> contentTypes;
 
-    private File file;
     private String url;
-    private ContentType contentType;
+    private int timeout;
+    private boolean isMultipart;
 
     private Post() {
         headers = new HashMap<>();
         data = new HashMap<>();
         params = new HashMap<>();
+        files = new HashMap<>();
+        contentTypes = new HashMap<>();
+        isMultipart = false;
+        timeout = -1;
     }
 
     private Post(Post p) {
@@ -44,8 +52,10 @@ public class Post {
         data = new HashMap<>(p.data);
         headers = new HashMap<>(p.headers);
         params = new HashMap<>(p.params);
-        file = p.file;
-        contentType = p.contentType;
+        files = new HashMap<>(p.files);
+        contentTypes = new HashMap<>(p.contentTypes);
+        timeout = p.timeout;
+        isMultipart = p.isMultipart;
     }
 
     public static Post create() {
@@ -53,9 +63,20 @@ public class Post {
         return p;
     }
 
+    public Post enableMultipart() {
+        isMultipart = true;
+        return this;
+    }
+
     public Post withUrl(String url) {
         Post p = new Post(this);
         p.url = url;
+        return p;
+    }
+
+    public Post withTimeout(int timeout) {
+        Post p = new Post(this);
+        p.timeout = timeout;
         return p;
     }
 
@@ -86,15 +107,23 @@ public class Post {
         return p;
     }
 
+    public Post withFile(String key, File f) {
+        Post p = new Post(this);
+        p.files.put(key, f);
+        return p;
+    }
+
     public Post withFile(File f, String mimeType) {
         Post p = new Post(this);
-        p.file = f;
-        p.contentType = ContentType.create(mimeType);
+        p.files.put("default", f);
+        p.contentTypes.put("default", ContentType.create(mimeType));
         return p;
     }
 
     public JSONObject json() {
-        return new JSONObject(response());
+        String str = response();
+        if (str == null) return null;
+        return new JSONObject(str);
     }
 
     public String response() {
@@ -104,14 +133,38 @@ public class Post {
                 queryParams.add(new BasicNameValuePair(k, v));
             });
             HttpPost post = new HttpPost(url + "?" + URLEncodedUtils.format(queryParams, "UTF-8"));
-            if (file == null) {
-                List<NameValuePair> params = new ArrayList<>();
-                data.forEach((k, v) -> {
-                    params.add(new BasicNameValuePair(k, v));
+            if (isMultipart) {
+                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+                params.forEach((k, v)-> {
+                    builder.addTextBody(k, v);
                 });
-                post.setEntity(new UrlEncodedFormEntity(params));
+                files.forEach((k, v)-> {
+                    builder.addBinaryBody(k, v);
+                });
+                post.setEntity(builder.build());
             } else {
-                post.setEntity(new FileEntity(file, contentType));
+                if (files.size() == 0) {
+                    List<NameValuePair> params = new ArrayList<>();
+                    data.forEach((k, v) -> {
+                        params.add(new BasicNameValuePair(k, v));
+                    });
+                    post.setEntity(new UrlEncodedFormEntity(params));
+                } else {
+                    String key = files.keySet().toArray(new String[]{})[0];
+                    if (contentTypes.get(key) == null) {
+                        post.setEntity(new FileEntity(files.get(key)));
+                    } else {
+                        post.setEntity(new FileEntity(files.get(key), contentTypes.get(key)));
+                    }
+                }
+            }
+
+            if (timeout != -1) {
+                RequestConfig requestConfig = RequestConfig.custom()
+                        .setSocketTimeout(timeout * 1000)
+                        .setConnectTimeout(timeout * 1000)
+                        .build();
+                post.setConfig(requestConfig);
             }
 
             headers.forEach((k, v) -> {
@@ -130,7 +183,8 @@ public class Post {
                 return null;
             }
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            e.printStackTrace();
+            return null;
         }
     }
 }

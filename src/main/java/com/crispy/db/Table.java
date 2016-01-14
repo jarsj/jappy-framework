@@ -133,6 +133,16 @@ public class Table {
         return this;
     }
 
+    public Table max(String... name) {
+        if (columnNames == null) {
+            columnNames = new ArrayList<String>();
+            columnFunctions = new ArrayList<String>();
+        }
+        columnFunctions.addAll(Collections.nCopies(name.length, "MAX"));
+        columnNames.addAll(Arrays.asList(name));
+        return this;
+    }
+
     /**
      * Using weird name due to conflict with COUNT function. We need to get rid of that.
      *
@@ -1049,27 +1059,6 @@ public class Table {
 
     public long min(String column) {
         functionName = "MIN";
-        functionColumn = column;
-        Connection con = DB.getConnection();
-        try {
-            PreparedStatement pstmt = createSelectStatement(con, false);
-            ResultSet results = pstmt.executeQuery();
-            if (results.next())
-                return results.getLong(1);
-            return 0;
-        } catch (Throwable t) {
-            LOG.error(t.getMessage(), t);
-            throw new IllegalStateException(t);
-        } finally {
-            try {
-                con.close();
-            } catch (Exception e) {
-            }
-        }
-    }
-
-    public long max(String column) {
-        functionName = "MAX";
         functionColumn = column;
         Connection con = DB.getConnection();
         try {

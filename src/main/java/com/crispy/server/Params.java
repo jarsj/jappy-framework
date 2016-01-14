@@ -1,5 +1,6 @@
 package com.crispy.server;
 
+import com.crispy.db.Row;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
@@ -22,6 +23,19 @@ public class Params {
     }
     private Params(Params o) {
         values = new HashMap<>(o.values);
+    }
+
+    public static Params create(Map values) {
+        Params p = new Params();
+        p.values.putAll(values);
+        return p;
+    }
+
+    public Params withoutKeys(String ...keys) {
+        Params ret = new Params(this);
+        for (String key : keys)
+            ret.values.remove(key);
+        return ret;
     }
 
     public static Params withRequest(HttpServletRequest request) {

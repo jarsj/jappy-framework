@@ -25,11 +25,9 @@ public class Template {
     }
 
     private freemarker.template.Template tpl;
-    private JSONWrapper wrapper;
 
     private Template(String content) throws IOException {
         tpl = new freemarker.template.Template(UUID.randomUUID().toString(), content, getConfiguration());
-        wrapper = new JSONWrapper();
     }
 
     public static Template fromString(String content) throws IOException {
@@ -40,23 +38,10 @@ public class Template {
     public String expand(JSONObject data) {
         try {
             StringWriter sw = new StringWriter();
-            tpl.process(data, sw, wrapper);
+            tpl.process(data, sw, JSONWrapper.INSTANCE);
             return sw.toString();
         } catch (Exception e) {
             throw new IllegalStateException("Error expanding template", e);
-        }
-    }
-
-    private class JSONWrapper extends DefaultObjectWrapper {
-        @Override
-        public TemplateModel wrap(Object obj) throws TemplateModelException {
-            if (obj instanceof JSONObject) {
-                return new JSONObjectModel((JSONObject) obj, this);
-            }
-            if (obj instanceof JSONArray) {
-                return new JSONArrayModel((JSONArray) obj, this);
-            }
-            return super.wrap(obj);
         }
     }
 }
