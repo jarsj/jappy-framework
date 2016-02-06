@@ -1,29 +1,18 @@
 package com.crispy.utils;
 
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.ProcessBuilder.Redirect;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
-import javax.imageio.ImageIO;
-import javax.servlet.ServletException;
-
+import com.crispy.cloud.Cloud;
+import com.crispy.log.Log;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
-import org.imgscalr.Scalr;
-import org.imgscalr.Scalr.Method;
-import org.imgscalr.Scalr.Mode;
 
-import com.crispy.cloud.Cloud;
-import com.crispy.log.Log;
+import javax.servlet.ServletException;
+import java.io.*;
+import java.lang.ProcessBuilder.Redirect;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class Image {
 
@@ -70,7 +59,7 @@ public class Image {
 
 	}
 	
-	private void resizeImage(File raw, File output, int width, int height, File tmpFolder) throws ServletException {
+	public void scale(File raw, File output, int width, int height) throws ServletException {
 		try {
 			if (raw == null || output == null || !raw.exists())
 				throw new ServletException("One of the argument " + raw + " , " + output + " is null");
@@ -102,9 +91,6 @@ public class Image {
 						 resizeCmd,
 						output.getAbsolutePath());
 			}
-			if (tmpFolder != null) {
-				pb.directory(tmpFolder);
-			}
 
             System.out.println(pb.command().toString());
 
@@ -119,7 +105,6 @@ public class Image {
 			throw new ServletException(e);
 		}
 	}
-
 
 	public String uploadS3Async(String s3Bucket, final InputStream input, String fileName, final int width, final int height) throws FileNotFoundException, IOException {
 		final String ext = fileName.substring(fileName.lastIndexOf('.') + 1);
@@ -137,7 +122,7 @@ public class Image {
 					File tmp = File.createTempFile("image", ext);
 					IOUtils.copy(input, new FileOutputStream(tmp));
 					File output = File.createTempFile("image_output", ext);
-					resizeImage(tmp, output, width, height, null);					
+                    scale(tmp, output, width, height);
 					Cloud.s3(bucket).create().allowRead().neverExpire().upload(parent + nextID + "." + ext, output);
 				} catch (Throwable t) {
 					t.printStackTrace();
@@ -162,33 +147,5 @@ public class Image {
 		IOUtils.copy(input, new FileOutputStream(tmp));
 		Cloud.s3(bucket).create().allowRead().neverExpire().upload(parent + nextID + "." + ext, tmp);
 		return "http://" + bucket + ".s3.amazonaws.com/" + parent + nextID + "." + ext;
-	}
-
-	public File scale(File source, int width, int height) throws IOException {
-		BufferedImage image = ImageIO.read(source);
-		String extension = source.getName().substring(source.getName().lastIndexOf(".") + 1);
-		File ret = internalScale(image, extension, width, height);
-		image.flush();
-		return ret;
-	}
-
-	public File scale(File source, int size) throws IOException {
-		String extension = source.getPath().substring(source.getAbsolutePath().lastIndexOf(".") + 1);
-		return internalScale(ImageIO.read(source), extension, size);
-	}
-
-	private File internalScale(BufferedImage image, String extension, int width, int height) throws IOException {
-		BufferedImage scaled = Scalr.resize(image, Method.ULTRA_QUALITY, Mode.FIT_EXACT, width, height);
-		File tempFile = File.createTempFile("tempScaled_", "." + extension);
-		ImageIO.write(scaled, extension, tempFile);
-		scaled.flush();
-		return tempFile;
-	}
-
-	private File internalScale(BufferedImage image, String extension, int size) throws IOException {
-		BufferedImage scaled = Scalr.resize(image, Method.ULTRA_QUALITY, size);
-		File tempFile = File.createTempFile("tempScaled_", "." + extension);
-		ImageIO.write(scaled, extension, tempFile);
-		return tempFile;
 	}
 }

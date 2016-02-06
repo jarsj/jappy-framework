@@ -36,8 +36,6 @@ public class Log {
 	private Log(String name) {
 		LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
 		this.logger = context.getLogger(name);
-		this.logger.setLevel(Level.ALL);
-		this.logger.detachAndStopAllAppenders();
 	}
 
 	public static Log get(String name) {
@@ -52,6 +50,12 @@ public class Log {
 		this.logger.setAdditive(inherit);
 		return this;
 	}
+
+    public Log clear() {
+        logger.setLevel(Level.ALL);
+        logger.detachAndStopAllAppenders();
+        return this;
+    }
 
 	public Log appender(Appender appender) {
 		if (appender.name != null) {

@@ -135,7 +135,7 @@ public class Post {
             HttpPost post = new HttpPost(url + "?" + URLEncodedUtils.format(queryParams, "UTF-8"));
             if (isMultipart) {
                 MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-                params.forEach((k, v)-> {
+                data.forEach((k, v)-> {
                     builder.addTextBody(k, v);
                 });
                 files.forEach((k, v)-> {

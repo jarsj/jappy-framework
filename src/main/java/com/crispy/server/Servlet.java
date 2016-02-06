@@ -289,9 +289,6 @@ public class Servlet extends HttpServlet {
                     if (pType == ParamType.LONG && !StringUtils.isNumeric(comps[p])) {
                         return false;
                     }
-                    if (pType == ParamType.STRING && StringUtils.isNumeric(comps[p])) {
-                        return false;
-                    }
                 } else {
                     if (!pathComponents[p].equals(comps[p])) {
                         return false;

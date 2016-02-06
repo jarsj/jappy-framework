@@ -41,14 +41,13 @@ public class Params {
     public static Params withRequest(HttpServletRequest request) {
         Params p = new Params();
         try {
+            p.loadNormal(request);
             if ((request.getContentType() != null) && (request.getContentType().toLowerCase().indexOf("application/json") > -1)) {
                 p.loadJSON(new JSONObject(IOUtils.toString(request.getReader())));
             }
             else if ((request.getContentType() != null) && (request.getContentType().toLowerCase().indexOf
                     ("multipart/form-data") > -1)) {
                 p.loadMultipart(request.getParts());
-            } else {
-                p.loadNormal(request);
             }
             return p;
         } catch (Exception e) {
