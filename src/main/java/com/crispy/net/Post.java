@@ -9,6 +9,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.FileEntity;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -30,7 +31,7 @@ public class Post {
     private HashMap<String, String> headers;
     private HashMap<String, String> data;
     private HashMap<String, String> params;
-    private HashMap<String, File> files;
+    private HashMap<String, Object> files;
     private HashMap<String, ContentType> contentTypes;
 
     private String url;
@@ -107,6 +108,13 @@ public class Post {
         return p;
     }
 
+    public Post withJSON(JSONObject o) {
+        Post p = new Post(this);
+        p.files.put("default", o);
+        p.contentTypes.put("default", ContentType.create("text/json"));
+        return p;
+    }
+
     public Post withFile(String key, File f) {
         Post p = new Post(this);
         p.files.put(key, f);
@@ -139,7 +147,11 @@ public class Post {
                     builder.addTextBody(k, v);
                 });
                 files.forEach((k, v)-> {
-                    builder.addBinaryBody(k, v);
+                    if (v instanceof File) {
+                        builder.addBinaryBody(k, (File) v);
+                    } else {
+                        builder.addTextBody(k, ((JSONObject)v).toString());
+                    }
                 });
                 post.setEntity(builder.build());
             } else {
@@ -151,10 +163,15 @@ public class Post {
                     post.setEntity(new UrlEncodedFormEntity(params));
                 } else {
                     String key = files.keySet().toArray(new String[]{})[0];
-                    if (contentTypes.get(key) == null) {
-                        post.setEntity(new FileEntity(files.get(key)));
+                    Object value = files.get(key);
+                    if (value instanceof File) {
+                        if (contentTypes.get(key) == null) {
+                            post.setEntity(new FileEntity((File) value));
+                        } else {
+                            post.setEntity(new FileEntity((File) value, contentTypes.get(key)));
+                        }
                     } else {
-                        post.setEntity(new FileEntity(files.get(key), contentTypes.get(key)));
+                        post.setEntity(new StringEntity(((JSONObject) value).toString()));
                     }
                 }
             }

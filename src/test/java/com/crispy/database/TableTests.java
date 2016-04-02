@@ -8,6 +8,8 @@ import org.junit.Test;
 
 import java.sql.SQLException;
 
+import static org.junit.Assert.*;
+
 /**
  * Created by harsh on 1/18/16.
  */
@@ -35,11 +37,16 @@ public class TableTests {
                         Column.text("name", 200),
                         Column.integer("salary")).constraints(Constraint.create("person_id", "person", "id")).create();
 
-        DB.updateQuery("INSERT INTO person(name, age) VALUES (?, ?)", "Harsh Jain", 20);
-        DB.updateQuery("INSERT INTO person(name, age) VALUES (?, ?)", "Ravi Gupta", 20);
-        DB.updateQuery("INSERT INTO person(name, age) VALUES (?, ?)", "Monica Belluci", 35);
-        DB.updateQuery("INSERT INTO salary(person_id, salary, name) VALUES (?,?,?)", 1, 100, "rent");
-        DB.updateQuery("INSERT INTO salary(person_id, salary, name) VALUES (?,?,?)", 1, 200, "monthly");
+        Insert.withTable("person").object("name", "Harsh Jain")
+                .object("age", 20).execute();
+        Insert.withTable("person").object("name", "Ravi Gupta")
+                .object("age", 20).execute();
+        Insert.withTable("person").object("name", "Monica Belluci")
+                .object("age", 35).execute();
+
+        Insert first = Insert.withTable("salary").object("person_id", 1);
+        first.object("salary", 100).object("name", "rent").execute();
+        first.object("salary", 200).object("name", "monthly").execute();
 
         Row row = Select.withTable("person", "salary").fetch("person", "name")
                 .fetchWithAlias("salary", "name", "salary_type").row();
@@ -50,8 +57,31 @@ public class TableTests {
         row = Select.withTable("person").count("total").row();
         System.out.println(row.toJSON());
 
-        row = Select.withTable("person").where(Where.equals("name", "Ravi Gupta")).row();
+        row = Select.withTable("person").where(Where.equals().column("name").value("Ravi Gupta")).row();
         System.out.println(row.toJSON());
+    }
 
+    @Test
+    public void testComplex() {
+        Table.get("school").columns(Column.bigInteger("id", true),
+                Column.text("name")).create();
+        long id = Insert.withTable("school").object("name", "Harsh School").executeAndFetch().byIndex(0).asLong();
+        System.out.println(id);
+        assertTrue(id > 0);
+    }
+
+    @Test
+    public void testBinary() {
+        Table.get("binary_table").columns(Column.bigInteger("id", true),
+                Column.binary("boom")).create();
+        Insert.withTable("binary_table").object("boom", new byte[]{1, 1, 1, 1, 1, 1}).execute();
+
+        Row r = Select.withTable("binary_table").row();
+
+        byte[] b = r.byName("boom").asBytes();
+        assertEquals(6, b.length);
+        for (int i = 0; i < 6; i++) {
+            assertEquals(1, b[i]);
+        }
     }
 }

@@ -1,6 +1,8 @@
 package com.crispy.database;
 
 import com.crispy.utils.Image;
+import com.mysql.jdbc.*;
+import com.mysql.jdbc.Blob;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -11,10 +13,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URL;
-import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -116,6 +115,11 @@ public class Column {
 	public static Column timestamp(String name) {
 		return timestamp(name, true);
 	}
+
+	public static Column binary(String name) {
+		return new Column(name, "BLOB");
+	}
+
 
 	public static Column timestamp(String name, boolean def) {
 		Column c = new Column(name, "TIMESTAMP");
@@ -274,6 +278,7 @@ public class Column {
 		return null;
 	}
 
+	@Deprecated
 	public Object parseObject(Object value) {
 		try {
 			if (value == null)
@@ -416,7 +421,12 @@ public class Column {
 					return null;
 				return Boolean.parseBoolean(value.toString().trim());
 			}
-
+            if (type.equals("BLOB")) {
+                if (value instanceof byte[]) {
+                    return value;
+                }
+                throw new IllegalArgumentException("Value should be of type byte[]");
+            }
 			return value;
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Can not parse value = " + value);
@@ -463,22 +473,10 @@ public class Column {
 			return SimpleType.INTEGER;
 		if (type.equals("BOOL"))
 			return SimpleType.BOOL;
+        if (type.equals("BLOB"))
+            return SimpleType.BINARY;
 
 		return SimpleType.TEXT;
-	}
-
-	public SimpleType simpleType(Metadata m) {
-		if (m != null && m.getConstraint(name) != null) {
-			Constraint c = m.getConstraint(name);
-			Metadata dest = DB.getMetadata(c.destTable);
-			if (dest.getDisplay() != null) {
-				return SimpleType.REFERENCE;
-			} else {
-				return SimpleType.TEXT;
-			}
-		}
-
-		return internalSimpleType();
 	}
 
 	public static Column bool(String name) {

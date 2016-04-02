@@ -12,17 +12,57 @@ import java.util.List;
  */
 public class Where {
     private WhereOp op;
-    private String column;
     private String table;
+    private String column;
+    private String function;
     private Object value[];
     private ArrayList<Where> children;
 
-    public static Where equals(String column, Object value) {
+    public static Where equals() {
+        return operator(WhereOp.EQUALS);
+    }
+
+    public static Where gt() {
+        return operator(WhereOp.GREATER_THAN);
+    }
+
+    public static Where gte() {
+        return operator(WhereOp.GREATER_THAN_EQUALS);
+    }
+
+    public static Where operator(WhereOp op) {
         Where w = new Where();
-        w.op = WhereOp.EQUALS;
-        w.column = column;
-        w.value = new Object[]{value};
+        w.op = op;
         return w;
+    }
+
+    public static Where or(Where... child) {
+        Where w = new Where();
+        w.op = WhereOp.OR;
+        w.children = new ArrayList<>(Arrays.asList(child));
+        return w;
+    }
+
+    public static Where and(Where... child) {
+        Where w = new Where();
+        w.op = WhereOp.AND;
+        w.children = new ArrayList<>(Arrays.asList(child));
+        return w;
+    }
+
+    public Where column(String column) {
+        this.column = column;
+        return this;
+    }
+
+    public Where table(String table) {
+        this.table = table;
+        return this;
+    }
+
+    public Where function(String fn) {
+        this.function = fn;
+        return this;
     }
 
     public Where not() {
@@ -57,25 +97,9 @@ public class Where {
         return this;
     }
 
-    public static Where or(Where ... child) {
-        Where w = new Where();
-        w.op = WhereOp.OR;
-        w.children = new ArrayList<>(Arrays.asList(child));
-        return w;
-    }
-
-    public static Where in(String column, Object ... values) {
-        Where w = new Where();
-        w.op = WhereOp.IN;
-        w.value = values;
-        return w;
-    }
-
-    public static Where and(Where ... child) {
-        Where w = new Where();
-        w.op = WhereOp.AND;
-        w.children = new ArrayList<>(Arrays.asList(child));
-        return w;
+    public Where value(Object... values) {
+        this.value = values;
+        return this;
     }
 
     public Where where(Where w) {
@@ -87,25 +111,6 @@ public class Where {
         return children.size() > 0;
     }
 
-    void assignTables(ArrayList<String> tables) {
-        if (table == null) {
-            for (String t : tables) {
-                Metadata m = DB.getMetadata(t);
-                if (m.containsColumn(column)) {
-                    if (table != null) {
-                        throw new IllegalArgumentException("Column " + column + " is ambiguous in where expression");
-                    }
-                    table = t;
-                }
-            }
-        }
-        if (children != null) {
-            for (Where child : children) {
-                child.assignTables(tables);
-            }
-        }
-    }
-
     String exp() {
         if (children != null) {
             List<String> childExps = new ArrayList<>();
@@ -114,9 +119,6 @@ public class Where {
             }
             return "(" + StringUtils.join(childExps, " " + op.sqlOp + " ") + ")";
         }
-        if (table == null) {
-            throw new IllegalStateException("Table can't be null. Forgot to call assignTables ?");
-        }
         switch (op) {
             case EQUALS:
             case NOT_EQUALS:
@@ -124,14 +126,26 @@ public class Where {
             case GREATER_THAN_EQUALS:
             case LESS_THAN:
             case LESS_THAN_EQUALS:
-                return "`" + table + "`.`" + column + "`" + op.sqlOp + "?";
+                return StringUtils.join(Collections.nCopies(value.length, leftExpr() + op.sqlOp + "?"), " AND ");
             case IN:
             case NOT_IN:
-                return "`" + table + "`.`" + column + "` " + op.sqlOp + " (" + StringUtils.join(Collections.nCopies(value.length,
+                return leftExpr() + " " + op.sqlOp + " (" + StringUtils.join(Collections.nCopies
+                        (value.length,
                         "?"), ",") + ")";
             default:
                 return null;
         }
+    }
+
+    private String leftExpr() {
+        String ret = "`" + column + "`";
+        if (table != null) {
+            ret = "`" + table + "`." + ret;
+        }
+        if (function != null) {
+            ret = function + "(" + ret + ")";
+        }
+        return ret;
     }
 
     Object[] values() {
@@ -142,10 +156,9 @@ public class Where {
             }
             return ret.toArray();
         }
-        Column c = DB.getMetadata(table).getColumn(column);
         Object[] ret = new Object[value.length];
         for (int i = 0; i < ret.length; i++) {
-            ret[i] = c.parseObject(value[i]);
+            ret[i] = value[i];
         }
         return ret;
     }

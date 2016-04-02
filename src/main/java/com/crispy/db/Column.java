@@ -507,7 +507,7 @@ public class Column {
 	}
 
 	private static java.util.Date parseTime(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
+		SimpleDateFormat format = new SimpleDateFormat("HH:mm:SS");
 		try {
 			return format.parse(value);
 		} catch (ParseException e) {
@@ -516,7 +516,7 @@ public class Column {
 	}
 
 	public static java.util.Date parseDateTime(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:MM:SS");
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS");
 		try {
 			return format.parse(value);
 		} catch (ParseException e) {

@@ -137,7 +137,7 @@ public class DB {
                 tableExists = true;
                 if (!table.equals("_metadata")) {
                     Row commentRow = Select.withTable("_metadata")
-                            .where(Where.equals("table", table))
+                            .where(Where.operator(WhereOp.EQUALS).column("table").value(table))
                             .row();
                     String comment = null;
                     if (commentRow != null) {

@@ -103,10 +103,6 @@ public class Metadata {
 		columns = new CopyOnWriteArrayList<Column>(temp);
 	}
 
-	public String getDisplay() {
-		return comment.optString("display", null);
-	}
-
 	public boolean dataEntry() {
 		if (name.startsWith("_"))
 			return false;

@@ -8,7 +8,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Created by harsh on 1/18/16.
@@ -34,7 +35,7 @@ public class Select {
     private int limit;
 
     private ArrayList<String> orderBy;
-    private String groupBy;
+    private ArrayList<String> groupBy;
 
     private Select() {
         this.tables = new ArrayList<>();
@@ -46,7 +47,7 @@ public class Select {
         this.start = 0;
         this.limit = -1;
         this.orderBy = new ArrayList<>();
-        this.groupBy = null;
+        this.groupBy = new ArrayList<>();
     }
 
     public static Select withTable(String... table) {
@@ -85,12 +86,17 @@ public class Select {
     }
 
     public Select groupBy(String column) {
-        groupBy = "`" + column + "`";
+        groupBy.add("`" + column + "`");
         return this;
     }
 
     public Select groupBy(String table, String column) {
-        groupBy = "`" + table + "`.`" + column + "`";
+        groupBy.add("`" + table + "`.`" + column + "`");
+        return this;
+    }
+
+    public Select groupByFunction(String fnName, String column) {
+        groupBy.add(fnName + "(`" + column + "`)");
         return this;
     }
 
@@ -209,8 +215,8 @@ public class Select {
         }
 
         whereStatement(sb);
-        if (groupBy != null) {
-            sb.append(" GROUP BY `" + groupBy + "`");
+        if (groupBy.size() > 0) {
+            sb.append(" GROUP BY " + StringUtils.join(groupBy, ","));
         }
 
         if (orderBy.size() > 0) {
@@ -236,7 +242,6 @@ public class Select {
 
     private void whereStatement(StringBuilder sb) {
         if (rootWhere.hasChildren()) {
-            rootWhere.assignTables(tables);
             sb.append(" WHERE " + rootWhere.exp());
         }
     }
@@ -249,6 +254,32 @@ public class Select {
             }
         }
         return ctr;
+    }
+
+    public Rows rows() {
+        Connection con = DB.getConnection();
+        try {
+            PreparedStatement pstmt = createSelectStatement(con);
+            Rows ret = new Rows();
+            ResultSet results = pstmt.executeQuery();
+            while (results.next()) {
+                Row r = new Row(results);
+                ret.addRow(r);
+            }
+
+            pstmt.close();
+
+            return ret;
+        } catch (Throwable t) {
+            LOG.error(t.getMessage(), t);
+            throw new IllegalStateException(t);
+        } finally {
+            try {
+                assert con != null;
+                con.close();
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     public Row row() {
@@ -268,8 +299,9 @@ public class Select {
             throw new IllegalStateException(t);
         } finally {
             try {
+                assert con != null;
                 con.close();
-            } catch (Throwable t) {
+            } catch (Throwable ignored) {
             }
         }
     }
@@ -288,6 +320,16 @@ public class Select {
             }
             return null;
         }
+    }
+
+    public Select descending(String column) {
+        this.orderBy.add("`" + column + "` DESC");
+        return this;
+    }
+
+    public Select limit(int l) {
+        limit = l;
+        return this;
     }
 
     private String tableForColumn(String column) {

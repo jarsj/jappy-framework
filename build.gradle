@@ -18,7 +18,7 @@
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '4.61'
+version = '4.68'
 
 if (hasProperty("mvncentral")) {
     isMvnCentral = mvncentral
@@ -30,6 +30,7 @@ repositories {
 }
 
 dependencies {
+    compile 'com.google.protobuf:protobuf-java:2.6.1'
     compile 'org.freemarker:freemarker:2.3.23'
     compile 'com.amazonaws:aws-java-sdk:1.9.16'
     compile 'commons-io:commons-io:2.4'

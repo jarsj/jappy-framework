@@ -480,6 +480,7 @@ public class Table {
         return values.get(index);
     }
 
+    @Deprecated
     public Table add() {
         Connection con = DB.getConnection();
         try {
@@ -606,11 +607,13 @@ public class Table {
         }
     }
 
-    public Table where(String column, Object value) {
+    @Deprecated
+    private Table where(String column, Object value) {
         return where(column, value, WhereOp.EQUALS);
     }
 
-    public Table notIn(String column, Object value[]) throws Exception {
+    @Deprecated
+    private Table notIn(String column, Object value[]) throws Exception {
         Metadata m = DB.getMetadata(name);
         Column c = Column.findByName(m.columns, column);
         if (c == null) {
@@ -624,7 +627,8 @@ public class Table {
         return this;
     }
 
-    public Table in(String column, Object value[]) {
+    @Deprecated
+    private Table in(String column, Object value[]) {
         Metadata m = DB.getMetadata(name);
         Column c = Column.findByName(m.columns, column);
         if (c == null) {
@@ -638,7 +642,8 @@ public class Table {
         return this;
     }
 
-    public Table or(String column, Object value[]) {
+    @Deprecated
+    private Table or(String column, Object value[]) {
         Metadata m = DB.getMetadata(name);
         Column c = Column.findByName(m.columns, column);
         if (c == null) {
@@ -652,7 +657,8 @@ public class Table {
         return this;
     }
 
-    public Table search(String[] columns, String query, MatchMode mode) {
+    @Deprecated
+    private Table search(String[] columns, String query, MatchMode mode) {
         Metadata m = DB.getMetadata(name);
         if (columns.length == 0) {
             throw new IllegalStateException("Not a single column available to match");
@@ -673,7 +679,8 @@ public class Table {
         return this;
     }
 
-    public Table where(String column, Object value, WhereOp op) {
+    @Deprecated
+    private Table where(String column, Object value, WhereOp op) {
         Metadata m = DB.getMetadata(name);
         if (m == null)
             throw new IllegalStateException("No table exists for " + name);
@@ -694,7 +701,8 @@ public class Table {
         return this;
     }
 
-    public Table limit(int l) {
+    @Deprecated
+    private Table limit(int l) {
         limit = l;
         return this;
     }
@@ -706,7 +714,8 @@ public class Table {
      * @param o
      * @return
      */
-    public Table afterDate(String column, Object o) {
+    @Deprecated
+    private Table afterDate(String column, Object o) {
         WhereExp exp = new WhereExp();
         exp.exp = "(DATE(`" + column + "`)>?)";
         exp.values = new Object[]{o};
@@ -721,7 +730,8 @@ public class Table {
      * @param o
      * @return
      */
-    public Table onOrAfterDate(String column, Object o) {
+    @Deprecated
+    private Table onOrAfterDate(String column, Object o) {
         WhereExp exp = new WhereExp();
         exp.exp = "(DATE(`" + column + "`)>=?)";
         exp.values = new Object[]{o};
@@ -729,7 +739,8 @@ public class Table {
         return this;
     }
 
-    public Table betweenDates(String column, LocalDate start, LocalDate end) {
+    @Deprecated
+    private Table betweenDates(String column, LocalDate start, LocalDate end) {
         WhereExp exp = new WhereExp();
         exp.exp = "(DATE(`" + column + "`)>=? AND DATE(`" + column + "`)<=?)";
         exp.values = new Object[]{start, end};
@@ -737,7 +748,8 @@ public class Table {
         return this;
     }
 
-    public Table onDate(String column, LocalDate d) {
+    @Deprecated
+    private Table onDate(String column, LocalDate d) {
         WhereExp exp = new WhereExp();
         exp.exp = "(DATE(`" + column + "`)=?)";
         exp.values = new Object[]{d};
@@ -745,7 +757,8 @@ public class Table {
         return this;
     }
 
-    public Table beforeDate(String column, Object o) {
+    @Deprecated
+    private Table beforeDate(String column, Object o) {
         WhereExp exp = new WhereExp();
         exp.exp = "(DATE(`" + column + "`)<?)";
         exp.values = new Object[]{o};
@@ -753,7 +766,8 @@ public class Table {
         return this;
     }
 
-    public Table onOrBeforeDate(String column, Object o) {
+    @Deprecated
+    private Table onOrBeforeDate(String column, Object o) {
         WhereExp exp = new WhereExp();
         exp.exp = "(DATE(`" + column + "`)<=?)";
         exp.values = new Object[]{o};
@@ -781,7 +795,8 @@ public class Table {
         return this;
     }
 
-    public void delete() {
+    @Deprecated
+    private void delete() {
         StringBuilder sb = new StringBuilder();
         sb.append("DELETE FROM `" + name + "`");
         whereStatement(sb);

@@ -1,6 +1,6 @@
 package com.crispy.server;
 
-import com.crispy.utils.Utils;
+import com.google.protobuf.Message;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -16,12 +16,9 @@ import javax.servlet.http.Part;
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic Servlet class that uses reflection to dedicate tasks to respective methods.
@@ -172,7 +169,13 @@ public class Servlet extends HttpServlet {
                     // which case it's an
                     if (!resp.isCommitted()) {
                         if (out != null) {
-                            if (out instanceof byte[]) {
+                            if (out instanceof Message) {
+                                byte data[] = ((Message) out).toByteArray();
+                                resp.setContentType("application/x-protobuf");
+                                resp.setContentLength(data.length);
+                                resp.getOutputStream().write(data);
+                                resp.getOutputStream().flush();
+                            } else if (out instanceof byte[]) {
                                 resp.getOutputStream().write((byte[]) out);
                                 resp.getOutputStream().flush();
                             } else {
