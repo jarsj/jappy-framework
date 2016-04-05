@@ -18,8 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang.StringUtils;
 import org.json.JSONArray;
 
-import com.crispy.db.DB;
-
 public class Utils {
 	public static DateFormat getMySQLDateformat() {
 		return new SimpleDateFormat("yyyy-MM-dd");
@@ -86,7 +84,8 @@ public class Utils {
 		List<Calendar> ret = new ArrayList<Calendar>();
 		Calendar c = Calendar.getInstance();
 		c.setTimeInMillis(from.getTimeInMillis());
-		while (!DB.formatAsDate(c).equals(DB.formatAsDate(to))) {
+		SimpleDateFormat format = new SimpleDateFormat();
+		while (c.getTimeInMillis() < to.getTimeInMillis()) {
 			ret.add((Calendar) c.clone());
 			c.add(Calendar.DATE, 1);
 		}
