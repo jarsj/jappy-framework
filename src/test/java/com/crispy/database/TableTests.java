@@ -1,12 +1,14 @@
 package com.crispy.database;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.db.names.ColumnName;
 import com.crispy.log.Appender;
 import com.crispy.log.Log;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.sql.SQLException;
+import java.time.LocalDate;
 
 import static org.junit.Assert.*;
 
@@ -18,7 +20,7 @@ public class TableTests {
     @BeforeClass
     public static void initDB() throws SQLException {
         Log.getRoot().appender(Appender.create().level(Level.DEBUG).console());
-        
+
         DB.drop("localhost", "tests_table", "root", "harsh");
         DB.create("localhost", "tests_table", "root", "harsh");
         DB.init("tests_table", "root", "harsh");
@@ -83,5 +85,23 @@ public class TableTests {
         for (int i = 0; i < 6; i++) {
             assertEquals(1, b[i]);
         }
+    }
+
+    @Test
+    public void testDates() {
+        Table.get("events").columns(Column.bigInteger("id", true),
+                Column.date("start"),
+                Column.date("end")).create();
+
+        for (int i = 0; i < 10; i++) {
+            assertEquals(1, Insert.withTable("events").date("start", LocalDate.of(2015, 06, 01))
+                    .date("end", LocalDate.of(2015, 07, 01))
+                    .execute());
+        }
+
+        assertEquals(10, Select.withTable("events").where(Where.equals().column("end").value(LocalDate.of(2015, 07,
+                01))).count
+                ("total").row().byAlias("total").asInt(0));
+
     }
 }

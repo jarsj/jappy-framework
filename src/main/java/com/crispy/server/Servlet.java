@@ -289,8 +289,19 @@ public class Servlet extends HttpServlet {
                     if (paramIndex == -1)
                         return false;
                     ParamType pType = argTypes[paramIndex];
-                    if (pType == ParamType.LONG && !StringUtils.isNumeric(comps[p])) {
-                        return false;
+                    if (pType == ParamType.LONG) {
+                        try {
+                            Long.parseLong(comps[p]);
+                        } catch (NumberFormatException e) {
+                            return false;
+                        }
+                    }
+                    if (pType == ParamType.DOUBLE) {
+                        try {
+                            Double.parseDouble(comps[p]);
+                        } catch (NumberFormatException e) {
+                            return false;
+                        }
                     }
                 } else {
                     if (!pathComponents[p].equals(comps[p])) {
