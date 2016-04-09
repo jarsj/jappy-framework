@@ -1,40 +1,41 @@
 package com.crispy.database;
 
-import com.crispy.utils.Utils;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.client.utils.URIBuilder;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.Blob;
 import java.sql.Date;
-import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Created by harsh on 1/5/16.
  */
 public class Value {
     private Object o;
+    private Value d;
 
     private Value(Object o) {
         this.o = o;
+        this.d = null;
     }
 
     public static Value create(Object o) {
         return new Value(o);
     }
 
+    public Value def(Object o) {
+        this.d = Value.create(o);
+        return this;
+    }
+
     public LocalDate asDate() {
         if (o == null)
-            return null;
+            return (d != null) ? d.asDate() : null;
         if (o instanceof Date)
             return ((Date) o).toLocalDate();
         if (o instanceof LocalDate)
@@ -46,7 +47,7 @@ public class Value {
 
     public long asLong() {
         if (o == null)
-            return 0;
+            return (d != null) ? d.asLong() : 0;
         if (o instanceof Number)
             return ((Number) o).longValue();
         if (o instanceof Timestamp)
@@ -54,32 +55,28 @@ public class Value {
         return Long.parseLong(o.toString());
     }
 
-    public int asInt(int def) {
+    public int asInt() {
         if (o == null)
-            return def;
+            return (d != null) ? d.asInt() : 0;
         if (o instanceof Number)
             return ((Number) o).intValue();
         return Integer.parseInt(o.toString());
     }
 
-    public String asString(String def) {
-        if (o == null)
-            return def;
-        return asString();
-    }
-
     public String asString() {
+        if (o == null)
+            return (d != null) ? d.asString() : null;
         if (o instanceof String)
             return (String) o;
         if (o instanceof Blob) {
             return new String(asBytes());
         }
-        if (o != null)
-            return o.toString();
         return null;
     }
 
     public byte[] asBytes() {
+        if (o == null)
+            return (d != null) ? d.asBytes() : null;
         if (o instanceof byte[])
             return (byte[]) o;
         if (o instanceof Blob) {
@@ -94,19 +91,19 @@ public class Value {
 
     public File asFile() {
         if (o == null)
-            return null;
+            return (d != null) ? d.asFile() : null;
         return new File(o.toString());
     }
 
     public URL asURL() throws MalformedURLException {
         if (o == null)
-            return null;
-        return new URL(o.toString());
+            return (d != null) ? d.asURL() : null;
+        return new URL(asString());
     }
 
     public Instant asInstant() {
         if (o == null)
-            return null;
+            return (d != null) ? d.asInstant() : null;
         if (o instanceof Instant)
             return (Instant) o;
         if (o instanceof Date)
@@ -121,6 +118,8 @@ public class Value {
     }
 
     public Object asObject() {
+        if (o == null)
+            return (d != null) ? d.asObject() : null;
         return o;
     }
 }
