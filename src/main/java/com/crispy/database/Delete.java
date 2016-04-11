@@ -5,6 +5,7 @@ import com.crispy.log.Log;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Collections;
 
 /**
  * Created by harsh on 4/1/16.
@@ -39,7 +40,7 @@ public class Delete {
             }
             PreparedStatement pstmt = con.prepareStatement(sb.toString());
             if (rootWhere.hasChildren()) {
-                Object[] values = rootWhere.values();
+                Object[] values = rootWhere.values(Collections.singletonList(table));
                 for (int i = 0; i < values.length; i++) {
                     pstmt.setObject(i + 1, values[i]);
                 }

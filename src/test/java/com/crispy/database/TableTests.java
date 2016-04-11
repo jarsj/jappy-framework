@@ -1,7 +1,6 @@
 package com.crispy.database;
 
 import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.db.names.ColumnName;
 import com.crispy.log.Appender;
 import com.crispy.log.Log;
 import org.junit.BeforeClass;
@@ -10,7 +9,8 @@ import org.junit.Test;
 import java.sql.SQLException;
 import java.time.LocalDate;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by harsh on 1/18/16.
@@ -94,14 +94,33 @@ public class TableTests {
                 Column.date("end")).create();
 
         for (int i = 0; i < 10; i++) {
-            assertEquals(1, Insert.withTable("events").date("start", LocalDate.of(2015, 06, 01))
-                    .date("end", LocalDate.of(2015, 07, 01))
+            assertEquals(1, Insert.withTable("events").object("start", LocalDate.of(2015, 06, 01))
+                    .object("end", LocalDate.of(2015, 07, 01))
                     .execute());
         }
 
         assertEquals(10, Select.withTable("events").where(Where.equals().column("end").value(LocalDate.of(2015, 07,
                 01))).count
-                ("total").row().byAlias("total").asInt(0));
+                ("total").row().byAlias("total").def(0).asInt());
 
+    }
+
+    @Test
+    public void testWhere() {
+        Table.get("boom").columns(Column.bigInteger("id", true),
+                Column.text("a"),
+                Column.bigInteger("b")).create();
+
+        Insert.withTable("boom").object("b", 10).execute();
+        Insert.withTable("boom").object("b", 11).execute();
+        Insert.withTable("boom").object("a", "hello").execute();
+        Insert.withTable("boom").object("a", "chalo").object("b", 20).execute();
+
+        assertEquals(2, Select.withTable("boom").where(Where.isNull().column("a")).count("total").row().byAlias
+                ("total").def(0).asInt());
+        assertEquals(1, Select.withTable("boom").where(Where.isNull().column("b")).count("total").row().byAlias
+                ("total").def(0).asInt());
+        assertEquals(3, Select.withTable("boom").where(Where.isNull().not().column("b")).count("total").row().byAlias
+                ("total").def(0).asInt());
     }
 }

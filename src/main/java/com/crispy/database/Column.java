@@ -1,26 +1,7 @@
 package com.crispy.database;
 
-import com.crispy.utils.Image;
-import com.mysql.jdbc.*;
-import com.mysql.jdbc.Blob;
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringEscapeUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.net.URL;
-import java.sql.*;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Calendar;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Collection;
 
 public class Column {
@@ -28,12 +9,6 @@ public class Column {
 	String type;
 	String def;
 	boolean autoIncrement;
-
-	String comment_folder;
-	String comment_s3;
-	boolean comment_base64;
-	String[] comment_cloudfront;
-	String comment_dimensions;
 
 	public Column(String name, String type) {
 		this.name = name;
@@ -44,42 +19,6 @@ public class Column {
 
 	public String getType() {
 		return type;
-	}
-
-	/**
-	 * File stored as base64.
-	 * 
-	 * @param name
-	 * @return
-	 */
-	public static Column base64(String name) {
-		Column c = new Column(name, "TEXT");
-		c.comment_base64 = true;
-		return c;
-	}
-
-	public static Column file(String name, String folder) {
-		Column c = new Column(name, "VARCHAR(512)");
-		c.comment_folder = folder;
-		return c;
-	}
-
-	public static Column image(String name, String bucket, int width, int height) {
-		Column c = new Column(name, "VARCHAR(512)");
-		c.comment_s3 = bucket;
-		c.comment_dimensions = String.format("(%d,%d)", width, height);
-		return c;
-	}
-
-	public static Column s3(String name, String bucket) {
-		Column c = new Column(name, "VARCHAR(512)");
-		c.comment_s3 = bucket;
-		return c;
-	}
-
-	public Column cloudfront(String... host) {
-		comment_cloudfront = host;
-		return this;
 	}
 
 	public static Column text(String name, int length) {
@@ -160,26 +99,6 @@ public class Column {
 		return c;
 	}
 
-	private JSONObject commentJSON() {
-		JSONObject ret = new JSONObject();
-		if (comment_folder != null) {
-			ret.put("folder", comment_folder);
-		}
-		if (comment_s3 != null) {
-			ret.put("s3", comment_s3);
-		}
-		if (comment_base64) {
-			ret.put("base64", true);
-		}
-		if (comment_cloudfront != null) {
-			ret.put("cloudfront", new JSONArray(Arrays.asList(comment_cloudfront)));
-		}
-		if (comment_dimensions != null) {
-			ret.put("dimensions", comment_dimensions);
-		}
-		return ret;
-	}
-
 	public String createDefinitions() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("`" + name + "` ");
@@ -199,19 +118,7 @@ public class Column {
 			}
 		} else if (autoIncrement)
 			sb.append(" PRIMARY KEY AUTO_INCREMENT");
-		JSONObject commentJSON = commentJSON();
-		if (commentJSON.length() > 0)
-			sb.append(" COMMENT '" + StringEscapeUtils.escapeSql(commentJSON.toString()) + "'");
 		return sb.toString();
-	}
-
-	private static JSONObject parseComment(String remarks) {
-		try {
-			JSONObject ret = new JSONObject(remarks);
-			return ret;
-		} catch (JSONException e) {
-			return new JSONObject();
-		}
 	}
 
 	public static Column parseResultSet(ResultSet results) throws SQLException {
@@ -221,26 +128,6 @@ public class Column {
 		c.def = results.getString("COLUMN_DEF");
 		c.autoIncrement = results.getString("IS_AUTOINCREMENT").equals("YES");
 
-		JSONObject commentJSON = parseComment(results.getString("REMARKS"));
-		if (commentJSON.has("folder")) {
-			c.comment_folder = commentJSON.getString("folder");
-		}
-		if (commentJSON.has("s3")) {
-			c.comment_s3 = commentJSON.getString("s3");
-		}
-		if (commentJSON.has("dimensions")) {
-			c.comment_dimensions = commentJSON.getString("dimensions");
-		}
-		if (commentJSON.has("cloudfront")) {
-			JSONArray cfArray = commentJSON.getJSONArray("cloudfront");
-			c.comment_cloudfront = new String[cfArray.length()];
-			for (int i = 0; i < cfArray.length(); i++) {
-				c.comment_cloudfront[i] = cfArray.getString(i);
-			}
-		}
-		if (commentJSON.has("base64")) {
-			c.comment_base64 = true;
-		}
 		if (type.equals("VARCHAR")) {
 			c.type = "VARCHAR(" + results.getInt("COLUMN_SIZE") + ")";
 		}
@@ -278,161 +165,6 @@ public class Column {
 		return null;
 	}
 
-	@Deprecated
-	public Object parseObject(Object value) {
-		try {
-			if (value == null)
-				return null;
-			if (value instanceof Value) {
-				return parseObject(((Value) value).asObject());
-			}
-			if (type.endsWith("TEXT") || type.startsWith("VARCHAR")) {
-				if (comment_folder != null) {
-					String uploadFolder = comment_folder;
-					if (value instanceof File) {
-						return Image.getInstance().uploadFile(uploadFolder, new FileInputStream((File) value), (
-								(File) value).getName());
-					} else if (value instanceof URL) {
-						return Image.getInstance().uploadFile(uploadFolder, ((URL) value).openStream(), ((URL) value)
-								.getPath());
-					} else {
-						String c = value.toString();
-						try {
-							File f = new File(c);
-							if (f.exists()) {
-								return f.getAbsolutePath();
-							} else {
-								return null;
-							}
-						} catch (Throwable t) {
-							return null;
-						}
-					}
-				} else if (comment_s3 != null) {
-					String s3Bucket = comment_s3;
-					String dimensions = comment_dimensions;
-					int width = -1, height = -1;
-					if (dimensions != null) {
-						dimensions = dimensions.substring(1, dimensions.length() - 1);
-						width = Integer.parseInt(dimensions.split(",")[0]);
-						height = Integer.parseInt(dimensions.split(",")[1]);
-					}
-					if (value instanceof File) {
-						return Image.getInstance()
-								.uploadS3Async(s3Bucket, new FileInputStream((File) value), ((File) value).getName(), width, height);
-					} else if (value instanceof URL) {
-						return Image.getInstance().uploadS3Async(s3Bucket, ((URL) value).openStream(), ((URL) value).getPath(), width, height);
-					} else {
-						return value.toString();
-					}
-				} else if (comment_base64) {
-					if (value instanceof File) {
-						return new String(Base64.encodeBase64(IOUtils.toByteArray(new FileInputStream((File) value))));
-					} else if (value instanceof URL) {
-						return new String(Base64.encodeBase64(IOUtils.toByteArray(((URL) value).openStream())));
-					} else {
-						return new String(Base64.encodeBase64(value.toString().getBytes()));
-					}
-				} else {
-					return value.toString();
-				}
-			}
-			if (type.equals("BIGINT")) {
-				if (value.toString().trim().length() == 0)
-					return null;
-				return Long.parseLong(value.toString());
-			}
-			if (type.equals("TIME")) {
-				if (value instanceof String) {
-					return parseTime((String) value);
-				}
-				if (value instanceof Long) {
-					return DB.formatAsTime(new Date((Long) value));
-				}
-				if (value instanceof Date) {
-					return value;
-				}
-				if (value instanceof java.util.Date)
-					return DB.formatAsTime((java.util.Date) value);
-				throw new IllegalArgumentException("Value should be of type time");
-			}
-
-			if (type.equals("DATE")) {
-				if (value instanceof String) {
-					return parseDate((String) value);
-				}
-				if (value instanceof Long)
-					return DB.formatAsDate(new Date((Long) value));
-				if (value instanceof Calendar)
-					return DB.formatAsDate((Calendar) value);
-				if (value instanceof Date)
-					return value;
-				if (value instanceof LocalDate)
-					return value;
-				if (value instanceof java.util.Date)
-					return DB.formatAsDate((java.util.Date) value);
-				throw new IllegalArgumentException("Value should be of type date");
-			}
-			if (type.equals("DATETIME")) {
-				if (value instanceof String) {
-					return parseDateTime((String) value);
-				}
-				if (value instanceof Date)
-					return value;
-				if (value instanceof java.util.Date)
-					return DB.formatAsDateTime((java.util.Date) value);
-				throw new IllegalArgumentException("Value should be of type date");
-			}
-			if (type.equals("TIMESTAMP")) {
-				if (value instanceof String) {
-					if (((String) value).trim().length() == 0)
-						return null;
-					return new Timestamp(Long.parseLong((String) value));
-				}
-				if (value instanceof java.util.Date)
-					return new Timestamp(((java.util.Date) value).getTime());
-				if (value instanceof Date)
-					return new Timestamp(((Date) value).getTime());
-				if (value instanceof Calendar)
-					return new Timestamp(((Calendar) value).getTimeInMillis());
-				if (value instanceof Timestamp)
-					return value;
-				if (value instanceof Instant) {
-					return Timestamp.from((Instant) value);
-				}
-				if (value instanceof Long)
-					return new Timestamp((Long) value);
-				if (value instanceof LocalDateTime)
-					return Timestamp.valueOf((LocalDateTime) value);
-				throw new IllegalArgumentException("Value should be of type Timestamp");
-			}
-			if (type.equals("INT")) {
-				if (value.toString().trim().length() == 0)
-					return null;
-				return Integer.parseInt(value.toString().trim());
-			}
-			if (type.equals("FLOAT")) {
-				if (value.toString().trim().length() == 0)
-					return null;
-				return Float.parseFloat(value.toString().trim());
-			}
-			if (type.equals("BOOL")) {
-				if (value.toString().trim().length() == 0)
-					return null;
-				return Boolean.parseBoolean(value.toString().trim());
-			}
-            if (type.equals("BLOB")) {
-                if (value instanceof byte[]) {
-                    return value;
-                }
-                throw new IllegalArgumentException("Value should be of type byte[]");
-            }
-			return value;
-		} catch (Exception e) {
-			throw new IllegalArgumentException("Can not parse value = " + value);
-		}
-	}
-
 	public String getName() {
 		return name;
 	}
@@ -441,22 +173,14 @@ public class Column {
 		return autoIncrement;
 	}
 
-	private SimpleType internalSimpleType() {
+	SimpleType internalSimpleType() {
 		if (type.startsWith("VARCHAR")) {
-			if (comment_folder != null) {
-				return SimpleType.FILE;
-			} else if (comment_s3 != null) {
-				return SimpleType.S3;
-			} else if (comment_base64) {
-				return SimpleType.BASE64;
+			String temp = type.substring(type.indexOf('(') + 1, type.indexOf(')'));
+			int length = Integer.parseInt(temp);
+			if (length < 200) {
+				return SimpleType.TEXT;
 			} else {
-				String temp = type.substring(type.indexOf('(') + 1, type.indexOf(')'));
-				int length = Integer.parseInt(temp);
-				if (length < 200) {
-					return SimpleType.TEXT;
-				} else {
-					return SimpleType.LONGTEXT;
-				}
+				return SimpleType.LONGTEXT;
 			}
 		}
 		if (type.endsWith("TEXT"))
@@ -492,49 +216,4 @@ public class Column {
 	public String getDefault() {
 		return def;
 	}
-
-	private static java.util.Date parseDate(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
-		try {
-			return format.parse(value);
-		} catch (ParseException e) {
-			return null;
-		}
-	}
-
-	private static java.util.Date parseTime(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("HH:MM:SS");
-		try {
-			return format.parse(value);
-		} catch (ParseException e) {
-			return null;
-		}
-	}
-
-	public static java.util.Date parseDateTime(String value) {
-		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:MM:SS");
-		try {
-			return format.parse(value);
-		} catch (ParseException e) {
-			return null;
-		}
-	}
-
-	public boolean isCandidateForNullValue(Object value) {
-		if (value == null)
-			return true;
-		if (!(value instanceof String))
-			return false;
-		String sValue = (String) value;
-		if (sValue.trim().length() != 0)
-			return false;
-		return type.equals("BIGINT") || type.equals("INT") || type.equals("FLOAT");
-	}
-
-	public boolean isDisplayAsURL() {
-		if (comment_s3 != null)
-			return true;
-		return false;
-	}
-
 }

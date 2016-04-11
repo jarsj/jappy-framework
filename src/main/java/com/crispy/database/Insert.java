@@ -4,7 +4,6 @@ import com.crispy.log.Log;
 import org.apache.commons.lang.StringUtils;
 
 import java.sql.*;
-import java.time.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,7 +17,7 @@ public class Insert {
     private String table;
 
     private ArrayList<String> columnNames;
-    private ArrayList<Object> values;
+    private ArrayList<Value> values;
     private boolean ignore;
     private ArrayList<String> overwriteColumns;
 
@@ -35,50 +34,13 @@ public class Insert {
         overwriteColumns = new ArrayList<>();
     }
 
-    public Insert timestamp(String column, Object o) {
-        Timestamp t = null;
-        if (o instanceof Timestamp) {
-            t = (Timestamp) o;
-        } else if (o instanceof Instant) {
-            t = Timestamp.from((Instant) o);
-        } else if (o instanceof Long) {
-            t = new Timestamp((Long) o);
-        }
-        if (t == null && o != null) {
-            throw new IllegalArgumentException("Can not create timestamp from " + o);
-        }
-        object(column, t);
-        return this;
-    }
-
-    public Insert date(String column, Object o) {
-        Date d = null;
-        if (o instanceof Date) {
-            d = (Date) o;
-        } else if (o instanceof LocalDate) {
-            d = Date.valueOf((LocalDate) o);
-        } else if (o instanceof LocalDateTime) {
-            d = Date.valueOf(((LocalDateTime) o).toLocalDate());
-        } else if (o instanceof Long) {
-            d = new Date((Long) o);
-        } else if (o instanceof Instant) {
-            d = new Date(((Instant) o).toEpochMilli());
-        }
-
-        if (d == null && o != null) {
-            throw new IllegalArgumentException("Can not convert date from " + o);
-        }
-        object(column, d);
-        return this;
-    }
-
     public Insert object(String column, Object o) {
         int index = columnNames.indexOf(column);
         if (index == -1) {
             columnNames.add(column);
-            values.add(o);
+            values.add(Value.create(o));
         } else {
-            values.set(index, o);
+            values.set(index, Value.create(o));
         }
         return this;
     }
@@ -119,7 +81,9 @@ public class Insert {
         if (index == -1) {
             throw new IllegalStateException("No Value supplied for the column=" + column);
         }
-        return values.get(index);
+        Value v = values.get(index);
+        Column c = DB.getMetadata(table).getColumn(column);
+        return v.convert(c.internalSimpleType());
     }
 
     private void validate() {
@@ -127,8 +91,6 @@ public class Insert {
             throw new IllegalStateException("You are overwriting atleast one column that doesn't exist");
         }
     }
-
-
 
     private String createQuery() {
         StringBuilder sb = new StringBuilder();
