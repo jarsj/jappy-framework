@@ -1,6 +1,7 @@
 package com.crispy.template;
 
 import com.crispy.log.Log;
+import freemarker.cache.FileTemplateLoader;
 import freemarker.template.*;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
@@ -69,10 +70,15 @@ public class Template {
     private Template(File f) throws IOException {
         tpl = new freemarker.template.Template(UUID.randomUUID().toString(), FileUtils.readFileToString(f),
                 getConfiguration());
+
         if (WATCH_SERVICE != null) {
             Path dir = f.toPath();
             dir.register(WATCH_SERVICE, StandardWatchEventKinds.ENTRY_MODIFY);
         }
+    }
+
+    public static void setMacroDirectory(File f) throws IOException {
+        getConfiguration().setTemplateLoader(new FileTemplateLoader(f));
     }
 
     public static Template fromString(String content) throws IOException {

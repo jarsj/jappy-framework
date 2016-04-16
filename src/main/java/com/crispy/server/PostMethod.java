@@ -12,4 +12,5 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 public @interface PostMethod {
     String path() default "";
+    String server() default "";
 }

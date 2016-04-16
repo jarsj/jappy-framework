@@ -45,8 +45,9 @@ public class Update {
         return this;
     }
 
-    public void where(Where w) {
+    public Update where(Where w) {
         whereRoot.where(w);
+        return this;
     }
 
     public int execute() {

@@ -19,6 +19,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic Servlet class that uses reflection to dedicate tasks to respective methods.
@@ -34,6 +35,7 @@ public class Servlet extends HttpServlet {
      */
     private MethodSpec[] getMethods;
     private MethodSpec[] postMethods;
+    private ConcurrentHashMap<String, String> serverAliases;
 
     /**
      * Convert a string to param
@@ -109,6 +111,11 @@ public class Servlet extends HttpServlet {
         super.init(config);
         getMethods = methodsForAnnotation(GetMethod.class);
         postMethods = methodsForAnnotation(PostMethod.class);
+        serverAliases = new ConcurrentHashMap<>();
+    }
+
+    protected void addServerAlias(String alias, String serverName) {
+        serverAliases.put(serverName, alias);
     }
 
     @Override
@@ -129,69 +136,91 @@ public class Servlet extends HttpServlet {
 
         Params params = Params.withRequest(req);
 
+        MethodSpec matching = null;
+
         for (int m = 0; m < methods.length; m++) {
             MethodSpec spec = methods[m];
-            if (spec.matches(pathComponents)) {
-                Object[] args = new Object[spec.args.length];
-                for (int a = 0; a < spec.args.length; a++) {
-                    ParamType pType = spec.argTypes[a];
-                    switch (pType) {
-                        case REQUEST: {
-                            args[a] = req;
-                            break;
-                        }
-                        case RESPONSE: {
-                            args[a] = resp;
-                            break;
-                        }
-                        case FILE: {
-                            args[a] = params.getFile(spec.args[a]);
-                            break;
-                        }
-                        case PARAMS: {
-                            args[a] = params;
-                            break;
-                        }
-                        default: {
-                            int pl = spec.argLocationInPath[a];
-                            if (pl != -1) {
-                                args[a] = paramAsObject(pathComponents[pl], pType, spec.defValues[a]);
-                            } else {
-                                args[a] = paramAsObject((String) params.getString(spec.args[a]), pType, spec.defValues[a]);
-                            }
-                        }
-                    }
-                }
-
-                try {
-                    Object out = spec.method.invoke(this, args);
-                    // It's possible for methods to directly write to response or sendError/Redirects. In
-                    // which case it's an
-                    if (!resp.isCommitted()) {
-                        if (out != null) {
-                            if (out instanceof Message) {
-                                byte data[] = ((Message) out).toByteArray();
-                                resp.setContentType("application/x-protobuf");
-                                resp.setContentLength(data.length);
-                                resp.getOutputStream().write(data);
-                                resp.getOutputStream().flush();
-                            } else if (out instanceof byte[]) {
-                                resp.getOutputStream().write((byte[]) out);
-                                resp.getOutputStream().flush();
-                            } else {
-                                resp.getWriter().write(out.toString());
-                                resp.getWriter().flush();
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    System.out.println(args);
-                    e.printStackTrace();
-                    throw new ServletException(e);
-                }
-
-                return;
+            if (spec.serverName != null) {
+                String lServer = req.getServerName().toLowerCase();
+                String alias = serverAliases.getOrDefault(lServer, lServer);
+                if (!alias.equals(spec.serverName))
+                    continue;
             }
+            if (spec.matches(pathComponents)) {
+                if (matching == null) {
+                    matching = spec;
+                }
+                else if (matching.serverName == null && spec.serverName != null) {
+                    matching = spec;
+                }
+            }
+        }
+
+        if (matching == null) {
+            resp.sendError(404);
+            return;
+        }
+
+        Object[] args = new Object[matching.args.length];
+        for (int a = 0; a < matching.args.length; a++) {
+            ParamType pType = matching.argTypes[a];
+            switch (pType) {
+                case REQUEST: {
+                    args[a] = req;
+                    break;
+                }
+                case RESPONSE: {
+                    args[a] = resp;
+                    break;
+                }
+                case FILE: {
+                    args[a] = params.getFile(matching.args[a]);
+                    break;
+                }
+                case PARAMS: {
+                    args[a] = params;
+                    break;
+                }
+                case SERVER: {
+                    args[a] = serverAliases.getOrDefault(req.getServerName(), req.getServerName());
+                    break;
+                }
+                default: {
+                    int pl = matching.argLocationInPath[a];
+                    if (pl != -1) {
+                        args[a] = paramAsObject(pathComponents[pl], pType, matching.defValues[a]);
+                    } else {
+                        args[a] = paramAsObject((String) params.getString(matching.args[a]), pType, matching
+                                .defValues[a]);
+                    }
+                }
+            }
+        }
+
+        try {
+            Object out = matching.method.invoke(this, args);
+            // It's possible for methods to directly write to response or sendError/Redirects. In
+            // which case it's an
+            if (!resp.isCommitted()) {
+                if (out != null) {
+                    if (out instanceof Message) {
+                        byte data[] = ((Message) out).toByteArray();
+                        resp.setContentType("application/x-protobuf");
+                        resp.setContentLength(data.length);
+                        resp.getOutputStream().write(data);
+                        resp.getOutputStream().flush();
+                    } else if (out instanceof byte[]) {
+                        resp.getOutputStream().write((byte[]) out);
+                        resp.getOutputStream().flush();
+                    } else {
+                        resp.getWriter().write(out.toString());
+                        resp.getWriter().flush();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ServletException(e);
         }
     }
 
@@ -202,7 +231,8 @@ public class Servlet extends HttpServlet {
         FILE,
         REQUEST,
         RESPONSE,
-        PARAMS
+        PARAMS,
+        SERVER
     }
 
     class MethodSpec {
@@ -213,21 +243,31 @@ public class Servlet extends HttpServlet {
         ParamType[] argTypes;
         String[] defValues;
         int[] argLocationInPath;
+        String serverName;
 
         MethodSpec(Method m) {
             String path = null;
+            serverName = null;
             {
                 GetMethod annt = m.getAnnotation(GetMethod.class);
                 if (annt != null) {
                     path = annt.path();
+                    serverName = annt.server();
+                    if (serverName.equals(""))
+                        serverName = null;
                 }
+
             }
             {
                 PostMethod annt = m.getAnnotation(PostMethod.class);
                 if (annt != null) {
                     path = annt.path();
+                    serverName = annt.server();
+                    if (serverName.equals(""))
+                        serverName = null;
                 }
             }
+
 
             pathComponents = StringUtils.split(path, '/');
 
@@ -241,36 +281,42 @@ public class Servlet extends HttpServlet {
             Parameter[] params = m.getParameters();
 
             for (int i = 0; i < P; i++) {
-                Param annotation = params[i].getAnnotation(Param.class);
-                Class type = params[i].getType();
-                argLocationInPath[i] = -1;
+                if (params[i].isAnnotationPresent(ServerParam.class)) {
+                    argLocationInPath[i] = -1;
+                    args[i] = null;
+                    argTypes[i] = ParamType.SERVER;
+                } else{
+                    Param annotation = params[i].getAnnotation(Param.class);
+                    Class type = params[i].getType();
+                    argLocationInPath[i] = -1;
 
-                if (type.equals(String.class)) {
-                    argTypes[i] = ParamType.STRING;
-                    args[i] = annotation.value();
-                    defValues[i] = annotation.def();
-                    argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
-                } else if (type.equals(Long.TYPE) || type.equals(Integer.TYPE) || type.equals(Short.TYPE)) {
-                    argTypes[i] = ParamType.LONG;
-                    args[i] = annotation.value();
-                    defValues[i] = annotation.def();
-                    argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
-                } else if (type.equals(Double.TYPE) || type.equals(Float.TYPE)) {
-                    argTypes[i] = ParamType.DOUBLE;
-                    args[i] = annotation.value();
-                    defValues[i] = annotation.def();
-                } else if (type.equals(HttpServletRequest.class)) {
-                    argTypes[i] = ParamType.REQUEST;
-                    args[i] = null;
-                } else if (type.equals(HttpServletResponse.class)) {
-                    argTypes[i] = ParamType.RESPONSE;
-                    args[i] = null;
-                } else if (type.equals(File.class)) {
-                    argTypes[i] = ParamType.FILE;
-                    args[i] = annotation.value();
-                } else if (type.equals(Params.class)) {
-                    argTypes[i] = ParamType.PARAMS;
-                    args[i] = null;
+                    if (type.equals(String.class)) {
+                        argTypes[i] = ParamType.STRING;
+                        args[i] = annotation.value();
+                        defValues[i] = annotation.def();
+                        argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
+                    } else if (type.equals(Long.TYPE) || type.equals(Integer.TYPE) || type.equals(Short.TYPE)) {
+                        argTypes[i] = ParamType.LONG;
+                        args[i] = annotation.value();
+                        defValues[i] = annotation.def();
+                        argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
+                    } else if (type.equals(Double.TYPE) || type.equals(Float.TYPE)) {
+                        argTypes[i] = ParamType.DOUBLE;
+                        args[i] = annotation.value();
+                        defValues[i] = annotation.def();
+                    } else if (type.equals(HttpServletRequest.class)) {
+                        argTypes[i] = ParamType.REQUEST;
+                        args[i] = null;
+                    } else if (type.equals(HttpServletResponse.class)) {
+                        argTypes[i] = ParamType.RESPONSE;
+                        args[i] = null;
+                    } else if (type.equals(File.class)) {
+                        argTypes[i] = ParamType.FILE;
+                        args[i] = annotation.value();
+                    } else if (type.equals(Params.class)) {
+                        argTypes[i] = ParamType.PARAMS;
+                        args[i] = null;
+                    }
                 }
             }
         }

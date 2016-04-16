@@ -78,6 +78,10 @@ public class Params {
         return null;
     }
 
+    public boolean isFile(String key) {
+        return values.get(key) instanceof File;
+    }
+
     public List<String> keys() {
         return new ArrayList<>(values.keySet());
     }
