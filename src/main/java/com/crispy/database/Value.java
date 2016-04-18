@@ -45,6 +45,16 @@ public class Value {
         return null;
     }
 
+    public Boolean asBool() {
+        if (o == null) {
+            return false;
+        }
+        if (o instanceof Boolean) {
+            return (Boolean) o;
+        }
+        return Boolean.parseBoolean(asString());
+    }
+
     public long asLong() {
         if (o == null)
             return (d != null) ? d.asLong() : 0;
