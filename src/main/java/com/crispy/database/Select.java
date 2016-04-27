@@ -248,7 +248,7 @@ public class Select {
 
     private int whereValues(PreparedStatement pstmt, int ctr) throws SQLException {
         if (rootWhere.hasChildren()) {
-            Object[] values = rootWhere.values();
+            Object[] values = rootWhere.values(tables);
             for (Object value : values) {
                 pstmt.setObject(ctr++, value);
             }

@@ -15,7 +15,7 @@ public class Where {
     private String table;
     private String column;
     private String function;
-    private Object value[];
+    private Value value[];
     private ArrayList<Where> children;
 
     public static Where equals() {
@@ -47,6 +47,13 @@ public class Where {
         Where w = new Where();
         w.op = WhereOp.AND;
         w.children = new ArrayList<>(Arrays.asList(child));
+        return w;
+    }
+
+    public static Where isNull() {
+        Where w = new Where();
+        w.op = WhereOp.IS_NULL;
+        w.function = "ISNULL";
         return w;
     }
 
@@ -91,6 +98,14 @@ public class Where {
             case NOT_IN:
                 op = WhereOp.IN;
                 break;
+            case IS_NULL:
+                op = WhereOp.IS_NOT_NULL;
+                function = "!ISNULL";
+                break;
+            case IS_NOT_NULL:
+                op = WhereOp.IS_NULL;
+                function = "ISNULL";
+                break;
             default:
                 break;
         }
@@ -98,7 +113,10 @@ public class Where {
     }
 
     public Where value(Object... values) {
-        this.value = values;
+        this.value = new Value[values.length];
+        for (int i = 0; i < values.length; i++) {
+            this.value[i] = Value.create(values[i]);
+        }
         return this;
     }
 
@@ -132,6 +150,9 @@ public class Where {
                 return leftExpr() + " " + op.sqlOp + " (" + StringUtils.join(Collections.nCopies
                         (value.length,
                         "?"), ",") + ")";
+            case IS_NULL:
+            case IS_NOT_NULL:
+                return leftExpr();
             default:
                 return null;
         }
@@ -148,18 +169,62 @@ public class Where {
         return ret;
     }
 
-    Object[] values() {
+    Object[] values(List<String> tables) {
         if (children != null) {
             ArrayList<Object> ret = new ArrayList<>();
             for (Where child : children) {
-                ret.addAll(Arrays.asList(child.values()));
+                ret.addAll(Arrays.asList(child.values(tables)));
             }
             return ret.toArray();
         }
+        if (value == null) {
+            return new Object[0];
+        }
+        SimpleType type = detectType(tables);
         Object[] ret = new Object[value.length];
         for (int i = 0; i < ret.length; i++) {
-            ret[i] = value[i];
+            ret[i] = value[i].convert(type);
         }
         return ret;
+    }
+
+    private SimpleType detectType(List<String> tables) {
+        SimpleType type = columnType(tables);
+        if (function == null) {
+            return type;
+        }
+        if (function.equals("SUM"))
+            return type;
+        if (function.equals("AVG"))
+            return type;
+        if (function.equals("COUNT"))
+            return SimpleType.INTEGER;
+        if (function.equals("DATE"))
+            return SimpleType.DATE;
+        if (function.equals("DATETIME"))
+            return SimpleType.DATETIME;
+        throw new UnsupportedOperationException("Function " + function + " is not supported");
+    }
+
+    private SimpleType columnType(List<String> tables) {
+        if (table != null) {
+            Column c = DB.getMetadata(table).getColumn(column);
+            return c.internalSimpleType();
+        }
+        Column c = null;
+        int count = 0;
+        for (String table : tables) {
+            c = DB.getMetadata(table).getColumn(column);
+            if (c != null) {
+                count++;
+            }
+        }
+        if (count == 0) {
+            throw new IllegalStateException("Column " + column + " doesn't exist in any table");
+        } else if (count == 1) {
+            return c.internalSimpleType();
+        } else {
+            throw new IllegalStateException("Column " + column + " is ambigiuous");
+        }
     }
 }

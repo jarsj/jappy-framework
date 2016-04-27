@@ -15,7 +15,9 @@ public enum WhereOp {
     OR("OR"),
     IN("IN"),
     NOT_IN("NOT IN"),
-    MATCH("MATCH");
+    MATCH("MATCH"),
+    IS_NULL("ISNULL"),
+    IS_NOT_NULL("!ISNULL");
 
     String sqlOp;
 

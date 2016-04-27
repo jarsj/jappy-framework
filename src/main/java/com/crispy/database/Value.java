@@ -8,9 +8,7 @@ import java.net.URL;
 import java.sql.Blob;
 import java.sql.Date;
 import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.*;
 
 /**
  * Created by harsh on 1/5/16.
@@ -33,6 +31,26 @@ public class Value {
         return this;
     }
 
+    public LocalDateTime asDateTime() {
+        if (o == null)
+            return (d != null) ? d.asDateTime() : null;
+        if (o instanceof Date) {
+            return LocalDateTime.ofInstant(((Date) o).toInstant(),
+                    ZoneId.systemDefault());
+        }
+        if (o instanceof LocalDate) {
+            return LocalDateTime.of((LocalDate) o, LocalTime.MIDNIGHT);
+        }
+        if (o instanceof LocalDateTime) {
+            return ((LocalDateTime) o);
+        }
+        if (o instanceof Instant) {
+            return LocalDateTime.ofInstant((Instant) o,
+                    ZoneId.systemDefault());
+        }
+        return null;
+    }
+
     public LocalDate asDate() {
         if (o == null)
             return (d != null) ? d.asDate() : null;
@@ -43,16 +61,6 @@ public class Value {
         if (o instanceof LocalDateTime)
             return ((LocalDateTime) o).toLocalDate();
         return null;
-    }
-
-    public Boolean asBool() {
-        if (o == null) {
-            return false;
-        }
-        if (o instanceof Boolean) {
-            return (Boolean) o;
-        }
-        return Boolean.parseBoolean(asString());
     }
 
     public long asLong() {
@@ -111,6 +119,11 @@ public class Value {
         return new URL(asString());
     }
 
+    public Timestamp asTimestamp() {
+        Instant i = asInstant();
+        return Timestamp.from(i);
+    }
+
     public Instant asInstant() {
         if (o == null)
             return (d != null) ? d.asInstant() : null;
@@ -123,8 +136,43 @@ public class Value {
         return null;
     }
 
+    public Boolean asBool() {
+        if (o == null) {
+            return (d != null) ? d.asBool() : false;
+        }
+        if (o instanceof Boolean)
+            return (Boolean) o;
+        if (o instanceof String) {
+            return Boolean.parseBoolean((String) o);
+        }
+        return null;
+    }
+
     public boolean isNull() {
         return o == null;
+    }
+
+    Object convert(SimpleType type) {
+        switch (type) {
+            case TEXT:
+            case LONGTEXT:
+                return asString();
+            case BOOL:
+                return asBool();
+            case DATETIME:
+                return asDateTime();
+            case DATE:
+                return asDate();
+            case TIMESTAMP:
+                return asTimestamp();
+            case INTEGER:
+                return asLong();
+            case REFERENCE:
+                return asLong();
+            case BINARY:
+                return asBytes();
+        }
+        return null;
     }
 
     public Object asObject() {
