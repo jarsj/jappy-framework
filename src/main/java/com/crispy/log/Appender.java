@@ -8,6 +8,7 @@ import java.net.URISyntaxException;
 import java.util.Properties;
 
 import ch.qos.logback.classic.Level;
+import com.amazonaws.services.opsworks.model.App;
 
 /**
  * @author harsh
@@ -34,6 +35,8 @@ public class Appender {
 	boolean smtpTls;
 	boolean smtpSsl;
 	boolean hourly;
+
+	boolean async;
 
 	private Appender(String name) {
 		this.name = name;
@@ -160,6 +163,11 @@ public class Appender {
 
 	public Appender to(String to) {
 		this.mailTo = to;
+		return this;
+	}
+
+	public Appender async() {
+		this.async = true;
 		return this;
 	}
 }
