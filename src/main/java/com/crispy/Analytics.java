@@ -54,7 +54,7 @@ public class Analytics {
 
         mLogger = Log.get("analytics");
 
-        Appender app = Appender.create().s3(S3_PATH, UNIQUE_ID)
+        Appender app = Appender.create("s3").s3(S3_PATH, UNIQUE_ID)
                 .folder(CACHE_PATH)
                 .level(Level.INFO)
                 .size(LOG_FILE_SIZE)

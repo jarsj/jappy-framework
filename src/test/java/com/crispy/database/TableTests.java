@@ -19,7 +19,7 @@ public class TableTests {
 
     @BeforeClass
     public static void initDB() throws SQLException {
-        Log.getRoot().appender(Appender.create().level(Level.DEBUG).console());
+        Log.getRoot().appender(Appender.create("console").level(Level.DEBUG).console());
 
         DB.drop("localhost", "tests_table", "root", "harsh");
         DB.create("localhost", "tests_table", "root", "harsh");

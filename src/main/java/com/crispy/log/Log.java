@@ -4,13 +4,10 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URLEncoder;
 
+import ch.qos.logback.classic.*;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.LoggerFactory;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.PatternLayout;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.filter.ThresholdFilter;
 import ch.qos.logback.classic.sift.MDCBasedDiscriminator;
@@ -58,9 +55,8 @@ public class Log {
     }
 
 	public Log appender(Appender appender) {
-		if (appender.name != null) {
-			logger.detachAppender(appender.name);
-		}
+        logger.detachAppender(appender.name);
+
 		if (appender.smtpHost != null) {
 			return smtpAppender(appender);
 		}
@@ -134,21 +130,43 @@ public class Log {
 			((RollingFileAppender<ILoggingEvent>) ret).setRollingPolicy(policy);
 		}
 
-		if (appender.name != null)
-			ret.setName(appender.name);
+        ret.setEncoder(encoder);
 
-		if (appender.level != null) {
-			ThresholdFilter lf = new ThresholdFilter();
-			lf.setLevel(appender.level.toString());
-			lf.setContext(logger.getLoggerContext());
-			lf.start();
-			ret.addFilter(lf);
-		}
+        if (appender.async) {
+            ret.start();
 
-		ret.setEncoder(encoder);
-		ret.start();
+            AsyncAppender aRet = new AsyncAppender();
+            aRet.setContext(logger.getLoggerContext());
+            aRet.addAppender(ret);
+            aRet.setName(appender.name);
+            aRet.setQueueSize(1000);
 
-		logger.addAppender(ret);
+            if (appender.level != null) {
+                ThresholdFilter lf = new ThresholdFilter();
+                lf.setLevel(appender.level.toString());
+                lf.setContext(logger.getLoggerContext());
+                lf.start();
+                aRet.addFilter(lf);
+            }
+            aRet.start();
+
+
+            logger.addAppender(aRet);
+        } else {
+            ret.setName(appender.name);
+
+            if (appender.level != null) {
+                ThresholdFilter lf = new ThresholdFilter();
+                lf.setLevel(appender.level.toString());
+                lf.setContext(logger.getLoggerContext());
+                lf.start();
+                ret.addFilter(lf);
+            }
+            ret.start();
+
+            logger.addAppender(ret);
+        }
+
 		return this;
 	}
 
