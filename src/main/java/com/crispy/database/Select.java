@@ -43,6 +43,7 @@ public class Select {
         this.columnAliases = new ArrayList<>();
         this.random = false;
 
+        joinType = JoinType.NORMAL;
         this.rootWhere = Where.and();
         this.start = 0;
         this.limit = -1;
@@ -58,6 +59,16 @@ public class Select {
 
     public Select where(Where w) {
         rootWhere.where(w);
+        return this;
+    }
+
+    public Select leftJoin() {
+        joinType = JoinType.LEFT;
+        return this;
+    }
+
+    public Select rightJoin() {
+        joinType = JoinType.RIGHT;
         return this;
     }
 
@@ -82,6 +93,26 @@ public class Select {
         checkColumn(column, false);
         columnExprs.add(fnName + "(`" + table + "`.`" + column + "`)");
         columnAliases.add(alias);
+        return this;
+    }
+
+    public Select orderByRandom() {
+        this.random = true;
+        return this;
+    }
+
+    public Select orderBy(String column, SortOrder order) {
+        this.orderBy.add("`" + column + "` " + order.sqlString());
+        return this;
+    }
+
+    public Select orderBy(String table, String column, SortOrder order) {
+        this.orderBy.add("`" + table + "`.`" + column + "` " + order.sqlString());
+        return this;
+    }
+
+    public Select orderByFunction(String fnName, String column, SortOrder order) {
+        this.orderBy.add(fnName + "(`" + column + "`) " + order.sqlString());
         return this;
     }
 
@@ -193,7 +224,7 @@ public class Select {
 
         sb.append(" FROM " + StringUtils.join(tables.stream().map((s) -> {
             return "`" + s + "`";
-        }).toArray(), " JOIN "));
+        }).toArray(), " " + joinType.sqlString() + " "));
         if (tables.size() > 1) {
             sb.append(" ON ");
 
@@ -322,10 +353,7 @@ public class Select {
         }
     }
 
-    public Select descending(String column) {
-        this.orderBy.add("`" + column + "` DESC");
-        return this;
-    }
+
 
     public Select limit(int l) {
         limit = l;

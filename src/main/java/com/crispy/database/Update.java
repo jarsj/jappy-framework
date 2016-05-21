@@ -54,8 +54,10 @@ public class Update {
         Connection con = DB.getConnection();
         try {
             String q = createQuery();
+            LOG.debug(q);
             PreparedStatement pstmt = con.prepareStatement(q);
             setValues(pstmt);
+
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException(e);
@@ -80,7 +82,6 @@ public class Update {
         Column c = DB.getMetadata(table).getColumn(column);
         return v.convert(c.internalSimpleType());
     }
-
 
     private void setValues(PreparedStatement pstmt) throws SQLException {
         int c = 1;

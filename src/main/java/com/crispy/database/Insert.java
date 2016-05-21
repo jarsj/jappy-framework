@@ -126,6 +126,7 @@ public class Insert {
         Connection con = DB.getConnection();
         try {
             String q = createQuery();
+            LOG.debug(q);
             PreparedStatement pstmt = con.prepareStatement(q);
             setValues(pstmt);
             return pstmt.executeUpdate();

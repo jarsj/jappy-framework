@@ -22,46 +22,21 @@ import java.util.concurrent.TimeUnit;
 public class Template {
 
     private static Configuration CONFIGURATION = null;
-    private static WatchService WATCH_SERVICE = null;
-    private static ScheduledExecutorService background;
 
     private static Configuration getConfiguration() {
         if (CONFIGURATION == null) {
             CONFIGURATION = new Configuration(Configuration.VERSION_2_3_23);
             CONFIGURATION.setDefaultEncoding("UTF-8");
             CONFIGURATION.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-
-            try {
-                WATCH_SERVICE = FileSystems.getDefault().newWatchService();
-                background = Executors.newSingleThreadScheduledExecutor();
-                background.scheduleWithFixedDelay(checkWatchService, 0, 10, TimeUnit.SECONDS);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
         return CONFIGURATION;
     }
 
-    private static final Runnable checkWatchService = new Runnable() {
-        @Override
-        public void run() {
-            try {
-                WatchKey key = WATCH_SERVICE.take();
-                for (WatchEvent<?> event : key.pollEvents()) {
-                    WatchEvent.Kind<?> kind = event.kind();
-                    if (kind == StandardWatchEventKinds.OVERFLOW)
-                        continue;
-
-                    WatchEvent<Path> ev = (WatchEvent<Path>)event;
-                    Path filename = ev.context();
-                    System.out.println(filename.toAbsolutePath().toString() + " has changed");
-                }
-            } catch (Exception e) {
-            }
-        }
-    };
-
     private freemarker.template.Template tpl;
+
+    private Template(freemarker.template.Template tpl) {
+        this.tpl = tpl;
+    }
 
     private Template(String content) throws IOException {
         tpl = new freemarker.template.Template(UUID.randomUUID().toString(), content, getConfiguration());
@@ -70,15 +45,15 @@ public class Template {
     private Template(File f) throws IOException {
         tpl = new freemarker.template.Template(UUID.randomUUID().toString(), FileUtils.readFileToString(f),
                 getConfiguration());
-
-        if (WATCH_SERVICE != null) {
-            Path dir = f.toPath();
-            dir.register(WATCH_SERVICE, StandardWatchEventKinds.ENTRY_MODIFY);
-        }
     }
 
     public static void setMacroDirectory(File f) throws IOException {
         getConfiguration().setTemplateLoader(new FileTemplateLoader(f));
+    }
+
+    public static Template byName(String name) throws IOException {
+        Template ret = new Template(getConfiguration().getTemplate(name));
+        return ret;
     }
 
     public static Template fromString(String content) throws IOException {

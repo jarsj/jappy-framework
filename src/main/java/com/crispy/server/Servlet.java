@@ -4,6 +4,7 @@ import com.google.protobuf.Message;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.BooleanUtils;
 import org.apache.commons.lang.StringUtils;
 import org.json.JSONObject;
 
@@ -48,18 +49,20 @@ public class Servlet extends HttpServlet {
         if (s == null)
             s = defValue;
         if (p == ParamType.LONG) {
-            try {
-                return Long.parseLong(s);
-            } catch (Exception e) {
-                return 0;
-            }
+            return Long.parseLong(s);
+        }
+        if (p == ParamType.INT) {
+            return Integer.parseInt(s);
         }
         if (p == ParamType.DOUBLE) {
-            try {
-                return Double.parseDouble(s);
-            } catch (Exception e) {
-                return 0;
-            }
+            return Double.parseDouble(s);
+        }
+        if (p == ParamType.BOOLEAN) {
+            if (s == null)
+                return false;
+            if (s.equals("on"))
+                return true;
+            return Boolean.parseBoolean(s);
         }
         return s;
     }
@@ -227,6 +230,8 @@ public class Servlet extends HttpServlet {
     enum ParamType {
         STRING,
         LONG,
+        INT,
+        BOOLEAN,
         DOUBLE,
         FILE,
         REQUEST,
@@ -296,7 +301,16 @@ public class Servlet extends HttpServlet {
                         defValues[i] = annotation.def();
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
                     } else if (type.equals(Long.TYPE) || type.equals(Integer.TYPE) || type.equals(Short.TYPE)) {
-                        argTypes[i] = ParamType.LONG;
+                        if (type.equals(Long.TYPE)) {
+                            argTypes[i] = ParamType.LONG;
+                        } else {
+                            argTypes[i] = ParamType.INT;
+                        }
+                        args[i] = annotation.value();
+                        defValues[i] = annotation.def();
+                        argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
+                    } else if (type.equals(Boolean.TYPE)) {
+                        argTypes[i] = ParamType.BOOLEAN;
                         args[i] = annotation.value();
                         defValues[i] = annotation.def();
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);

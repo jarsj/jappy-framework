@@ -14,7 +14,7 @@ import java.util.TreeSet;
 public class Row {
     private static final Log LOG = Log.get("jappy.db");
 
-    private ArrayList<Object> values;
+    private ArrayList<Value> values;
     private ArrayList<String> columnNames;
     private ArrayList<String> tableNames;
     private ArrayList<String> columnAlias;
@@ -33,11 +33,14 @@ public class Row {
             columnNames.add(column);
             tableNames.add(table);
             columnAlias.add(alias);
-            values.add(results.getObject(c + 1));
+            values.add(Value.create(results.getObject(c + 1)));
         }
     }
 
     public Value byName(String name) {
+        int index = columnNames.indexOf(name);
+        if (index == -1)
+            throw new IllegalArgumentException("No such column exist : " + name);
         return byIndex(columnNames.indexOf(name));
     }
 
@@ -55,7 +58,7 @@ public class Row {
     }
 
     public Value byIndex(int i) {
-        return Value.create(values.get(i));
+        return values.get(i);
     }
 
     public JSONObject toJSON() {
@@ -69,10 +72,10 @@ public class Row {
         return ret;
     }
 
-    private void put(JSONObject o, String key, Object value) {
+    private void put(JSONObject o, String key, Value value) {
         int dot = key.indexOf('.');
         if (dot == -1) {
-            o.put(key, value);
+            o.put(key, value.asObject());
         } else {
             String first = key.substring(0, dot);
             String second = key.substring(dot + 1);

@@ -23,6 +23,8 @@ public class Value {
     }
 
     public static Value create(Object o) {
+        if (o instanceof Value)
+            return (Value) o;
         return new Value(o);
     }
 
@@ -89,7 +91,7 @@ public class Value {
         if (o instanceof Blob) {
             return new String(asBytes());
         }
-        return null;
+        return o.toString();
     }
 
     public byte[] asBytes() {
@@ -127,6 +129,9 @@ public class Value {
     public Instant asInstant() {
         if (o == null)
             return (d != null) ? d.asInstant() : null;
+        if (o instanceof Number) {
+            return Instant.ofEpochMilli(((Number)o).longValue());
+        }
         if (o instanceof Instant)
             return (Instant) o;
         if (o instanceof Date)
@@ -179,5 +184,17 @@ public class Value {
         if (o == null)
             return (d != null) ? d.asObject() : null;
         return o;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) return isNull();
+        if (isNull()) return false;
+        if (obj instanceof String) return asString().equals(obj);
+        if (obj instanceof Boolean) return asBool().equals(obj);
+        if (obj instanceof Instant) return asInstant().equals(obj);
+        if (obj instanceof Number) return (asLong() == ((Number) obj).longValue());
+
+        return asObject().equals(obj);
     }
 }
