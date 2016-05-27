@@ -1,14 +1,11 @@
 package com.crispy.log;
 
-import java.io.FileNotFoundException;
+import ch.qos.logback.classic.Level;
+
 import java.io.FileReader;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
-
-import ch.qos.logback.classic.Level;
-import com.amazonaws.services.opsworks.model.App;
 
 /**
  * @author harsh
@@ -77,13 +74,6 @@ public class Appender {
 
 	public Appender level(Level level) {
 		this.level = level;
-		return this;
-	}
-
-	public Appender level(String property, Level defLevel) {
-		String level = System.getProperty(property, defLevel.toString());
-		System.out.println("Setting level to property=" + property + " value=" + System.getProperty(property) + " default=" + defLevel);
-		this.level = Level.toLevel(level);
 		return this;
 	}
 

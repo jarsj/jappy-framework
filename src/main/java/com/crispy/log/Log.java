@@ -54,6 +54,18 @@ public class Log {
         return this;
     }
 
+	void changeLevel(String appenderName, Level l) {
+		ch.qos.logback.core.Appender<ILoggingEvent> appender = logger.getAppender(appenderName);
+		appender.clearAllFilters();
+
+		ThresholdFilter lf = new ThresholdFilter();
+		lf.setLevel(l.toString());
+		lf.setContext(logger.getLoggerContext());
+		lf.start();
+
+		appender.addFilter(lf);
+	}
+
 	public Log appender(Appender appender) {
         logger.detachAppender(appender.name);
 
