@@ -4,7 +4,6 @@ import com.google.protobuf.Message;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.BooleanUtils;
 import org.apache.commons.lang.StringUtils;
 import org.json.JSONObject;
 
@@ -42,9 +41,9 @@ public class Servlet extends HttpServlet {
      * @param p
      * @return
      */
-    static Object paramAsObject(String s, ParamType p, String defValue) {
+    static Object paramAsObject(String s, ParamType p) {
         if (s == null)
-            s = defValue;
+            return null;
         if (p == ParamType.LONG) {
             return Long.parseLong(s);
         }
@@ -173,6 +172,10 @@ public class Servlet extends HttpServlet {
                     args[a] = resp;
                     break;
                 }
+                case SESSION: {
+                    args[a] = req.getSession(true);
+                    break;
+                }
                 case FILE: {
                     args[a] = params.getFile(matching.args[a]);
                     break;
@@ -188,10 +191,9 @@ public class Servlet extends HttpServlet {
                 default: {
                     int pl = matching.argLocationInPath[a];
                     if (pl != -1) {
-                        args[a] = paramAsObject(pathComponents[pl], pType, matching.defValues[a]);
+                        args[a] = paramAsObject(pathComponents[pl], pType);
                     } else {
-                        args[a] = paramAsObject((String) params.getString(matching.args[a]), pType, matching
-                                .defValues[a]);
+                        args[a] = paramAsObject((String) params.getString(matching.args[a]), pType);
                     }
                 }
             }
@@ -281,16 +283,19 @@ public class Servlet extends HttpServlet {
             args = new String[P];
             argTypes = new ParamType[P];
             argLocationInPath = new int[P];
+            session = new boolean[P];
             Parameter[] params = m.getParameters();
 
             for (int i = 0; i < P; i++) {
-
+                session[i] = false;
                 if (params[i].isAnnotationPresent(ServerParam.class)) {
                     argLocationInPath[i] = -1;
                     args[i] = null;
                     argTypes[i] = ParamType.SERVER;
                 } else{
-                    Param annotation = params[i].getAnnotation(Param.class);
+                    Param annotationP = params[i].getAnnotation(Param.class);
+                    Session annotationS = params[i].getAnnotation(Session.class);
+
                     Class type = params[i].getType();
                     argLocationInPath[i] = -1;
 
@@ -331,6 +336,10 @@ public class Servlet extends HttpServlet {
                     }
                 }
             }
+        }
+
+        String getValue(Param appP, Session annS) {
+            
         }
 
         boolean matches(String[] comps) {
