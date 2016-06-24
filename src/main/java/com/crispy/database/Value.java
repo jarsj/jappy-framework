@@ -46,6 +46,9 @@ public class Value {
         if (o instanceof LocalDateTime) {
             return ((LocalDateTime) o);
         }
+        if (o instanceof Timestamp) {
+            return LocalDateTime.ofInstant(((Timestamp) o).toInstant(), ZoneId.systemDefault());
+        }
         if (o instanceof Instant) {
             return LocalDateTime.ofInstant((Instant) o,
                     ZoneId.systemDefault());
@@ -58,6 +61,8 @@ public class Value {
             return (d != null) ? d.asDate() : null;
         if (o instanceof Date)
             return ((Date) o).toLocalDate();
+        if (o instanceof Timestamp)
+            return LocalDateTime.ofInstant(((Timestamp) o).toInstant(), ZoneId.systemDefault()).toLocalDate();
         if (o instanceof LocalDate)
             return (LocalDate) o;
         if (o instanceof LocalDateTime)

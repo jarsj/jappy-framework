@@ -10,10 +10,7 @@ import org.json.JSONObject;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Part;
+import javax.servlet.http.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -236,6 +233,7 @@ public class Servlet extends HttpServlet {
         FILE,
         REQUEST,
         RESPONSE,
+        SESSION,
         PARAMS,
         SERVER
     }
@@ -244,10 +242,11 @@ public class Servlet extends HttpServlet {
         Method method;
 
         String[] pathComponents;
+        boolean[] session;
         String[] args;
         ParamType[] argTypes;
-        String[] defValues;
         int[] argLocationInPath;
+
         String serverName;
 
         MethodSpec(Method m) {
@@ -280,12 +279,12 @@ public class Servlet extends HttpServlet {
 
             method = m;
             args = new String[P];
-            defValues = new String[P];
             argTypes = new ParamType[P];
             argLocationInPath = new int[P];
             Parameter[] params = m.getParameters();
 
             for (int i = 0; i < P; i++) {
+
                 if (params[i].isAnnotationPresent(ServerParam.class)) {
                     argLocationInPath[i] = -1;
                     args[i] = null;
@@ -298,7 +297,6 @@ public class Servlet extends HttpServlet {
                     if (type.equals(String.class)) {
                         argTypes[i] = ParamType.STRING;
                         args[i] = annotation.value();
-                        defValues[i] = annotation.def();
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
                     } else if (type.equals(Long.TYPE) || type.equals(Integer.TYPE) || type.equals(Short.TYPE)) {
                         if (type.equals(Long.TYPE)) {
@@ -307,17 +305,14 @@ public class Servlet extends HttpServlet {
                             argTypes[i] = ParamType.INT;
                         }
                         args[i] = annotation.value();
-                        defValues[i] = annotation.def();
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
                     } else if (type.equals(Boolean.TYPE)) {
                         argTypes[i] = ParamType.BOOLEAN;
                         args[i] = annotation.value();
-                        defValues[i] = annotation.def();
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
                     } else if (type.equals(Double.TYPE) || type.equals(Float.TYPE)) {
                         argTypes[i] = ParamType.DOUBLE;
                         args[i] = annotation.value();
-                        defValues[i] = annotation.def();
                     } else if (type.equals(HttpServletRequest.class)) {
                         argTypes[i] = ParamType.REQUEST;
                         args[i] = null;
@@ -329,6 +324,9 @@ public class Servlet extends HttpServlet {
                         args[i] = annotation.value();
                     } else if (type.equals(Params.class)) {
                         argTypes[i] = ParamType.PARAMS;
+                        args[i] = null;
+                    } else if (type.equals(HttpSession.class)) {
+                        argTypes[i] = ParamType.SESSION;
                         args[i] = null;
                     }
                 }
@@ -356,6 +354,15 @@ public class Servlet extends HttpServlet {
                             return false;
                         }
                     }
+
+                    if (pType == ParamType.INT) {
+                        try {
+                            Integer.parseInt(comps[p]);
+                        } catch (NumberFormatException e) {
+                            return false;
+                        }
+                    }
+
                     if (pType == ParamType.DOUBLE) {
                         try {
                             Double.parseDouble(comps[p]);

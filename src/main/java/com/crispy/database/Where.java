@@ -30,6 +30,14 @@ public class Where {
         return operator(WhereOp.GREATER_THAN_EQUALS);
     }
 
+    public static Where lt() {
+        return operator(WhereOp.LESS_THAN);
+    }
+
+    public static Where lte() {
+        return operator(WhereOp.LESS_THAN_EQUALS);
+    }
+
     public static Where operator(WhereOp op) {
         Where w = new Where();
         w.op = op;
@@ -214,9 +222,10 @@ public class Where {
         Column c = null;
         int count = 0;
         for (String table : tables) {
-            c = DB.getMetadata(table).getColumn(column);
-            if (c != null) {
+            Column temp = DB.getMetadata(table).getColumn(column);
+            if (temp != null) {
                 count++;
+                c = temp;
             }
         }
         if (count == 0) {
