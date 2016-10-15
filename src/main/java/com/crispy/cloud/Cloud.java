@@ -16,6 +16,7 @@ import java.util.TreeSet;
 import javax.servlet.http.HttpServletResponse;
 
 import com.crispy.net.Get;
+import com.crispy.net.Http;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpEntity;
@@ -364,20 +365,21 @@ public class Cloud {
 
 	public static String userData() {
 		try {
-			return Get.create().withUrl("http://169.254.169.254/latest/user-data").withTimeout(5).response();
+			try (Http http = Http.builder().withTimeoutInSeconds(5, 5).build()) {
+				return http.get("http://169.254.169.254/latest/user-data").toString();
+			}
 		} catch (Exception e) {
-			LOG.warn(e.getMessage(), e);
 			return null;
 		}
 	}
 
 	public static String instanceId() {
 		try {
-			return Get.create().withUrl("http://169.254.169.254/latest/meta-data/instance-id").withTimeout(5)
-					.response();
+			try (Http http = Http.builder().withTimeoutInSeconds(5, 5).build()) {
+				return http.get("http://169.254.169.254/latest/meta-data/instance-id").toString();
+			}
 		} catch (Exception e) {
-			LOG.warn(e.getMessage(), e);
-			return "local";
+			return null;
 		}
 	}
 

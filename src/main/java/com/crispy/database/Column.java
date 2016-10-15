@@ -43,6 +43,10 @@ public class Column {
 		return new Column(name, "FLOAT");
 	}
 
+	public static Column dbl(String name) {
+		return new Column(name, "DOUBLE");
+	}
+
 	public static Column longtext(String name) {
 		return new Column(name, "LONGTEXT");
 	}
@@ -199,6 +203,10 @@ public class Column {
 			return SimpleType.BOOL;
         if (type.equals("BLOB"))
             return SimpleType.BINARY;
+		if (type.equals("FLOAT"))
+			return SimpleType.FLOAT;
+		if (type.equals("DOUBLE"))
+			return SimpleType.DOUBLE;
 
 		return SimpleType.TEXT;
 	}

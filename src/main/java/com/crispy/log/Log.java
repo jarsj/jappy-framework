@@ -56,6 +56,9 @@ public class Log {
 
 	void changeLevel(String appenderName, Level l) {
 		ch.qos.logback.core.Appender<ILoggingEvent> appender = logger.getAppender(appenderName);
+		if (appenderName == null) {
+			throw new IllegalArgumentException("No appender " + appenderName + " in logger " + logger.getName());
+		}
 		appender.clearAllFilters();
 
 		ThresholdFilter lf = new ThresholdFilter();
@@ -98,6 +101,8 @@ public class Log {
 			} else {
 				policy = new TimeBasedRollingPolicy<ILoggingEvent>();
 			}
+
+			policy.setMaxHistory(appender.history);
 
 			if (appender.folder == null) {
 				appender.folder = "/tmp";

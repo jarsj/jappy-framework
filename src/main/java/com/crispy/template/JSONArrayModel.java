@@ -25,4 +25,8 @@ public class JSONArrayModel extends WrappingTemplateModel implements TemplateSeq
     public int size() throws TemplateModelException {
         return a.length();
     }
+
+    public JSONArray getAsJSONArray() {
+        return a;
+    }
 }

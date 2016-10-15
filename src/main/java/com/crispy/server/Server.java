@@ -1,9 +1,8 @@
 package com.crispy.server;
 
 import com.crispy.utils.Pair;
-import org.apache.catalina.Context;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.Wrapper;
+import org.apache.catalina.*;
+import org.apache.catalina.connector.Connector;
 import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.coyote.http11.Http11NioProtocol;
@@ -20,6 +19,7 @@ import javax.websocket.server.ServerContainer;
 import javax.websocket.server.ServerEndpoint;
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author harsh
@@ -31,13 +31,18 @@ public class Server {
     private String baseDir;
     private List<Class<? extends HttpServlet>> mServlets;
     private List<ServletInfo> mServletObjects;
+    private boolean mHttps;
     private String welcomeFile;
     private HashMap<Class<? extends HttpServlet>, HashMap<String, String>> mInitParams;
     private static List<Class> websocketEndpoints = new ArrayList<>();
+    private AtomicBoolean started;
 
     public Server(String ip, int port) {
         tomcat = new Tomcat();
+        mHttps = false;
         tomcat.setPort(port);
+        started = new AtomicBoolean(false);
+        baseDir = "";
         if (ip != null) {
             tomcat.getConnector().setProperty("address", ip);
         }
@@ -48,6 +53,24 @@ public class Server {
     }
     public Server(int port) {
         this(null, port);
+    }
+
+    public void enableHttps(int port, String keystoreFile, String keystorePass, String keyAlias) {
+        if (mHttps)
+            return;
+        mHttps = true;
+        Connector httpsConnector = new Connector();
+        httpsConnector.setPort(port);
+        httpsConnector.setSecure(true);
+        httpsConnector.setScheme("https");
+        httpsConnector.setAttribute("keyAlias", keyAlias);
+        httpsConnector.setAttribute("keystorePass", keystorePass);
+        httpsConnector.setAttribute("keystoreFile", keystoreFile);
+        httpsConnector.setAttribute("clientAuth", "false");
+        httpsConnector.setAttribute("sslProtocol", "TLS");
+        httpsConnector.setAttribute("SSLEnabled", true);
+
+        tomcat.getService().addConnector(httpsConnector);
     }
 
     public void setConnectorProperty(String key, String value) {
@@ -102,10 +125,27 @@ public class Server {
         this.welcomeFile = wf;
     }
 
+    public boolean isStarted() {
+        return started.get();
+    }
+
+    public void startAsync() throws InterruptedException {
+        new Thread(() -> {
+            try {
+                start();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+        while (!isStarted()) {
+            Thread.sleep(1000);
+        }
+    }
+
     public void start() throws Exception {
         File docBase = new File(".");
-
-        Context ctx = tomcat.addContext("", new File(docBase, baseDir).getAbsolutePath());
+        File ctxtDir = new File(docBase, baseDir);
+        Context ctx = tomcat.addContext("", ctxtDir.getAbsolutePath());
         ctx.addApplicationListener(Config.class.getName());
         if (this.welcomeFile != null)
             ctx.addWelcomeFile(welcomeFile);
@@ -153,6 +193,14 @@ public class Server {
         }
 
         Http11NioProtocol protocol = (Http11NioProtocol) tomcat.getConnector().getProtocolHandler();
+        tomcat.getServer().addLifecycleListener(new LifecycleListener() {
+            @Override
+            public void lifecycleEvent(LifecycleEvent event) {
+                if (event.getType().equals("after_start")) {
+                    started.set(true);
+                }
+            }
+        });
         tomcat.start();
         tomcat.getServer().await();
     }

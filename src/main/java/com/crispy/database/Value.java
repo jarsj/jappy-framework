@@ -7,6 +7,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.Blob;
 import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.*;
 
@@ -70,6 +71,19 @@ public class Value {
         return null;
     }
 
+    public LocalTime asTime() {
+        if (o == null)
+            return (d != null) ? d.asTime() : null;
+        if (o instanceof LocalTime)
+            return (LocalTime) o;
+        if (o instanceof Time)
+            return ((Time) o).toLocalTime();
+        LocalDateTime dt = asDateTime();
+        if (dt != null)
+            return dt.toLocalTime();
+        return null;
+    }
+
     public long asLong() {
         if (o == null)
             return (d != null) ? d.asLong() : 0;
@@ -97,6 +111,22 @@ public class Value {
             return new String(asBytes());
         }
         return o.toString();
+    }
+
+    public float asFloat() {
+        if (o == null)
+            return (d != null) ? d.asFloat() : 0.0f;
+        if (o instanceof Number)
+            return ((Number) o).floatValue();
+        return Float.parseFloat(o.toString());
+    }
+
+    public double asDouble() {
+        if (o == null)
+            return (d != null) ? d.asDouble() : 0.0;
+        if (o instanceof Number)
+            return ((Number) o).doubleValue();
+        return Double.parseDouble(o.toString());
     }
 
     public byte[] asBytes() {
@@ -171,6 +201,8 @@ public class Value {
                 return asBool();
             case DATETIME:
                 return asDateTime();
+            case TIME:
+                return asTime();
             case DATE:
                 return asDate();
             case TIMESTAMP:
@@ -181,6 +213,10 @@ public class Value {
                 return asLong();
             case BINARY:
                 return asBytes();
+            case FLOAT:
+                return asFloat();
+            case DOUBLE:
+                return asDouble();
         }
         return null;
     }
@@ -198,6 +234,8 @@ public class Value {
         if (obj instanceof String) return asString().equals(obj);
         if (obj instanceof Boolean) return asBool().equals(obj);
         if (obj instanceof Instant) return asInstant().equals(obj);
+        if (obj instanceof Double) return Math.abs(asDouble() - (Double) obj) < 1E-6;
+        if (obj instanceof Float) return Math.abs(asFloat() - (Float) obj) < 1E-6;
         if (obj instanceof Number) return (asLong() == ((Number) obj).longValue());
 
         return asObject().equals(obj);

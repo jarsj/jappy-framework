@@ -17,7 +17,7 @@ public class LogServlet extends Servlet {
     public void changeLevel(@Param("name") String name,
                             @Param("appender") String appender,
                             @Param("level") String level) {
-        if (name.equals("")) {
+        if (name == null) {
             Log.getRoot().changeLevel(appender, Level.toLevel(level.toUpperCase()));
         } else {
             Log.get(name).changeLevel(appender, Level.toLevel(level.toUpperCase()));

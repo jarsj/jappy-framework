@@ -1,10 +1,15 @@
 package com.crispy.server;
 
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.SharedMetricRegistries;
+import com.crispy.log.Log;
 import com.google.protobuf.Message;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.math.DoubleRange;
 import org.json.JSONObject;
 
 import javax.servlet.ServletConfig;
@@ -27,6 +32,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Servlet extends HttpServlet {
 
+    private Log LOG = Log.get("servlet");
+
     /**
      * TODO: What about delete/put ?
      */
@@ -34,34 +41,7 @@ public class Servlet extends HttpServlet {
     private MethodSpec[] postMethods;
     private ConcurrentHashMap<String, String> serverAliases;
 
-    /**
-     * Convert a string to param
-     *
-     * @param s
-     * @param p
-     * @return
-     */
-    static Object paramAsObject(String s, ParamType p) {
-        if (s == null)
-            return null;
-        if (p == ParamType.LONG) {
-            return Long.parseLong(s);
-        }
-        if (p == ParamType.INT) {
-            return Integer.parseInt(s);
-        }
-        if (p == ParamType.DOUBLE) {
-            return Double.parseDouble(s);
-        }
-        if (p == ParamType.BOOLEAN) {
-            if (s == null)
-                return false;
-            if (s.equals("on"))
-                return true;
-            return Boolean.parseBoolean(s);
-        }
-        return s;
-    }
+    private Meter mRequests;
 
     private static String getFileName(final Part part) {
         for (String content : part.getHeader("content-disposition").split(";")) {
@@ -111,6 +91,9 @@ public class Servlet extends HttpServlet {
         getMethods = methodsForAnnotation(GetMethod.class);
         postMethods = methodsForAnnotation(PostMethod.class);
         serverAliases = new ConcurrentHashMap<>();
+
+        MetricRegistry registry = getMetricRegistry();
+        mRequests = registry.meter(getClass().getName() + ".requests");
     }
 
     protected void addServerAlias(String alias, String serverName) {
@@ -119,17 +102,22 @@ public class Servlet extends HttpServlet {
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        LOG.info("doPost " + req.getContextPath() + req.getPathInfo());
         doMethod(req, resp, postMethods);
     }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        LOG.info("doGet " + req.getServerName() + "/" + req.getContextPath() + req.getPathInfo() + "?" + req
+                .getQueryString());
         doMethod(req, resp, getMethods);
     }
 
     private void doMethod(HttpServletRequest req, HttpServletResponse resp, MethodSpec[] methods) throws
             ServletException,
             IOException {
+        mRequests.mark();
+
         String path = req.getPathInfo();
         String[] pathComponents = StringUtils.split(path, "/");
 
@@ -160,9 +148,13 @@ public class Servlet extends HttpServlet {
             return;
         }
 
+        LOG.debug("matched method " + matching.method.getName());
+
         Object[] args = new Object[matching.args.length];
         for (int a = 0; a < matching.args.length; a++) {
             ParamType pType = matching.argTypes[a];
+            if (pType == null)
+                throw new IllegalStateException("Argument " + a + " " + matching.args[a] + " has a null type");
             switch (pType) {
                 case REQUEST: {
                     args[a] = req;
@@ -191,9 +183,18 @@ public class Servlet extends HttpServlet {
                 default: {
                     int pl = matching.argLocationInPath[a];
                     if (pl != -1) {
-                        args[a] = paramAsObject(pathComponents[pl], pType);
+                        args[a] = castObject(pathComponents[pl], pType);
                     } else {
-                        args[a] = paramAsObject((String) params.getString(matching.args[a]), pType);
+                        if (matching.session[a]) {
+                            HttpSession session = req.getSession(false);
+                            if (session == null) {
+                                args[a] = null;
+                            } else {
+                                args[a] = castObject(session.getAttribute(matching.args[a]), pType);
+                            }
+                        } else {
+                            args[a] = castObject((String) params.getString(matching.args[a]), pType);
+                        }
                     }
                 }
             }
@@ -221,9 +222,35 @@ public class Servlet extends HttpServlet {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
             throw new ServletException(e);
         }
+    }
+
+    private Object castObject(Object o, ParamType type) {
+        if (o == null)
+            return null;
+        if (type == ParamType.LONG) {
+            if (o instanceof Long) return o;
+            return Long.parseLong(o.toString());
+        }
+        if (type == ParamType.INT) {
+            if (o instanceof Integer) return o;
+            return Integer.parseInt(o.toString());
+        }
+        if (type == ParamType.DOUBLE) {
+            if (o instanceof Double) return o;
+            return Double.parseDouble(o.toString());
+        }
+        if (type == ParamType.BOOLEAN) {
+            if (o == null)
+                return false;
+            if (o instanceof Boolean)
+                return o;
+            if (o.toString().equals("on"))
+                return true;
+            return Boolean.parseBoolean(o.toString());
+        }
+        return o;
     }
 
     enum ParamType {
@@ -293,15 +320,16 @@ public class Servlet extends HttpServlet {
                     args[i] = null;
                     argTypes[i] = ParamType.SERVER;
                 } else{
-                    Param annotationP = params[i].getAnnotation(Param.class);
-                    Session annotationS = params[i].getAnnotation(Session.class);
+                    Param annP = params[i].getAnnotation(Param.class);
+                    Session annS = params[i].getAnnotation(Session.class);
 
                     Class type = params[i].getType();
                     argLocationInPath[i] = -1;
+                    session[i] = annS != null;
 
                     if (type.equals(String.class)) {
                         argTypes[i] = ParamType.STRING;
-                        args[i] = annotation.value();
+                        args[i] = getValue(annP, annS);
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
                     } else if (type.equals(Long.TYPE) || type.equals(Integer.TYPE) || type.equals(Short.TYPE)) {
                         if (type.equals(Long.TYPE)) {
@@ -309,15 +337,24 @@ public class Servlet extends HttpServlet {
                         } else {
                             argTypes[i] = ParamType.INT;
                         }
-                        args[i] = annotation.value();
+                        args[i] = getValue(annP, annS);
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
-                    } else if (type.equals(Boolean.TYPE)) {
+                    } else if (type.equals(Long.class) || type.equals(Integer.class)) {
+                        if (type.equals(Long.class)) {
+                            argTypes[i] = ParamType.LONG;
+                        } else {
+                            argTypes[i] = ParamType.INT;
+                        }
+                        args[i] = getValue(annP, annS);
+                        argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
+                    } else if (type.equals(Boolean.TYPE) || type.equals(Boolean.class)) {
                         argTypes[i] = ParamType.BOOLEAN;
-                        args[i] = annotation.value();
+                        args[i] = getValue(annP, annS);
                         argLocationInPath[i] = ArrayUtils.indexOf(pathComponents, ":" + args[i]);
-                    } else if (type.equals(Double.TYPE) || type.equals(Float.TYPE)) {
+                    } else if (type.equals(Double.TYPE) || type.equals(Float.TYPE) || type.equals(Double.class) ||
+                            type.equals(Float.class)) {
                         argTypes[i] = ParamType.DOUBLE;
-                        args[i] = annotation.value();
+                        args[i] = getValue(annP, annS);
                     } else if (type.equals(HttpServletRequest.class)) {
                         argTypes[i] = ParamType.REQUEST;
                         args[i] = null;
@@ -326,7 +363,7 @@ public class Servlet extends HttpServlet {
                         args[i] = null;
                     } else if (type.equals(File.class)) {
                         argTypes[i] = ParamType.FILE;
-                        args[i] = annotation.value();
+                        args[i] = getValue(annP, annS);
                     } else if (type.equals(Params.class)) {
                         argTypes[i] = ParamType.PARAMS;
                         args[i] = null;
@@ -339,7 +376,9 @@ public class Servlet extends HttpServlet {
         }
 
         String getValue(Param appP, Session annS) {
-            
+            if (appP != null) return appP.value();
+            if (annS != null) return annS.value();
+            return null;
         }
 
         boolean matches(String[] comps) {
@@ -387,5 +426,13 @@ public class Servlet extends HttpServlet {
             }
             return true;
         }
+    }
+
+    protected MetricRegistry getMetricRegistry() {
+        return SharedMetricRegistries.getOrCreate("jappy");
+    }
+
+    protected void setLogger(Log log) {
+        LOG = log;
     }
 }

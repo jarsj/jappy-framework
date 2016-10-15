@@ -3,6 +3,7 @@ package com.crispy.database;
 import ch.qos.logback.classic.Level;
 import com.crispy.log.Appender;
 import com.crispy.log.Log;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -246,5 +247,27 @@ public class TableTests {
 
         Row r = Select.withTable("booboo").row();
         assertEquals("hello", r.byName("name").asString());
+    }
+
+    @Test
+    public void testDouble() {
+        Table.get("booboo").columns(Column.bigInteger("id", true),
+                Column.dbl("money")).create();
+
+        Insert.withTable("booboo").object("money", 10.24f).execute();
+        Insert.withTable("booboo").object("money", 10.25).execute();
+        Insert.withTable("booboo").object("money", "10.26").execute();
+        Insert.withTable("booboo").object("money", 11).execute();
+
+        List<Row> rows = Select.withTable("booboo").rows().getRows();
+        assertEquals(10.24, rows.get(0).byName("money").asDouble(), 0.0001);
+        assertEquals(10.25f, rows.get(1).byName("money").asFloat(), 0.0001f);
+        assertEquals(10.26, rows.get(2).byName("money").asDouble(), 0.0001);
+        assertEquals(11, rows.get(3).byName("money").asInt());
+    }
+
+    @After
+    public void tearDown() {
+        Table.get("booboo").drop(true);
     }
 }

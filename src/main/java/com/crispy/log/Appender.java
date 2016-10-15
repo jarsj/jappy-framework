@@ -21,6 +21,7 @@ public class Appender {
 	String size;
 	String pattern;
 	Level level;
+	int history;
 	//
 	String mailTo;
 	String mailFrom;
@@ -40,6 +41,7 @@ public class Appender {
 		daily = false;
 		hourly = false;
         async = false;
+		history = 0;
 		pattern = "%c{2} %-12date{YYYY-MM-dd HH:mm:ss.SSS} %-5level - %msg%n";
 	}
 
@@ -69,6 +71,11 @@ public class Appender {
 	
 	public Appender daily() {
 		daily = true;
+		return this;
+	}
+
+	public Appender history(int n) {
+		history = n;
 		return this;
 	}
 

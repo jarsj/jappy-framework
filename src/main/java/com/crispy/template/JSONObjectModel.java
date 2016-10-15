@@ -48,4 +48,8 @@ public class JSONObjectModel extends WrappingTemplateModel implements TemplateHa
     public boolean isEmpty() throws TemplateModelException {
         return o.length() == 0;
     }
+
+    public JSONObject getAsJSONObject() {
+        return o;
+    }
 }

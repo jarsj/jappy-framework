@@ -9,5 +9,8 @@ public enum SimpleType {
 	DATETIME,
 	TIMESTAMP,
 	REFERENCE,
-	BINARY, BOOL
+	BINARY,
+	BOOL,
+	FLOAT,
+	DOUBLE
 }

@@ -1,207 +1,172 @@
 package com.crispy.net;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.FileEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.net.URISyntaxException;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Created by harsh on 11/15/15.
  */
 public class Post {
-    private HashMap<String, String> headers;
-    private HashMap<String, String> data;
-    private HashMap<String, String> params;
-    private HashMap<String, Object> files;
-    private HashMap<String, ContentType> contentTypes;
+    private PostBuilder mPost;
 
-    private String url;
-    private int timeout;
-    private boolean isMultipart;
-
-    private Post() {
-        headers = new HashMap<>();
-        data = new HashMap<>();
-        params = new HashMap<>();
-        files = new HashMap<>();
-        contentTypes = new HashMap<>();
-        isMultipart = false;
-        timeout = -1;
+    private Post(PostBuilder post) {
+        mPost = post;
     }
 
-    private Post(Post p) {
-        url = p.url;
-        data = new HashMap<>(p.data);
-        headers = new HashMap<>(p.headers);
-        params = new HashMap<>(p.params);
-        files = new HashMap<>(p.files);
-        contentTypes = new HashMap<>(p.contentTypes);
-        timeout = p.timeout;
-        isMultipart = p.isMultipart;
+    HttpPost createHttpPost() {
+        return mPost.create();
     }
 
-    public static Post create() {
-        Post p = new Post();
-        return p;
+    public static PostBuilder builder(String url) {
+        return new PostBuilder(url);
     }
 
-    public Post enableMultipart() {
-        isMultipart = true;
-        return this;
+    public PostBuilder builder() {
+        return new PostBuilder(mPost);
     }
 
-    public Post withUrl(String url) {
-        Post p = new Post(this);
-        p.url = url;
-        return p;
-    }
+    public static class PostBuilder {
+        private HashMap<String, String> headers;
+        private HashMap<String, Object> files;
+        private HashMap<String, ContentType> contentTypes;
 
-    public Post withTimeout(int timeout) {
-        Post p = new Post(this);
-        p.timeout = timeout;
-        return p;
-    }
+        URIBuilder uriBuilder;
 
-    public Post withHeader(String key, String value) {
-        Post p = new Post(this);
-        p.headers.put(key, value);
-        return p;
-    }
+        HashMap<String, String> data;
 
-    public Post withParams(String key, String value) {
-        Post p = new Post(this);
-        p.params.put(key, value);
-        return p;
-    }
+        private boolean isMultipart;
 
-
-    public Post withData(String ... args) {
-        Post p = new Post(this);
-        for (int i = 0; i < args.length; i += 2) {
-            p.data.put(args[i], args[i + 1]);
+        PostBuilder(PostBuilder old) {
+            try {
+                uriBuilder = new URIBuilder(old.uriBuilder.build());
+                headers = new HashMap<>(old.headers);
+                data = new HashMap<>(old.data);
+                files = new HashMap<>(old.files);
+                contentTypes = new HashMap<>(old.contentTypes);
+                isMultipart = old.isMultipart;
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("Can't parse");
+            }
         }
-        return p;
-    }
 
-    public Post withData(Map<String, String> args) {
-        Post p = new Post(this);
-        p.data.putAll(args);
-        return p;
-    }
+        PostBuilder(String url) {
+            try {
+                uriBuilder = new URIBuilder(url);
+                headers = new HashMap<>();
+                data = new HashMap<>();
+                files = new HashMap<>();
+                contentTypes = new HashMap<>();
+                isMultipart = false;
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("Can't parse url " + url);
+            }
+        }
 
-    public Post withJSON(JSONObject o) {
-        Post p = new Post(this);
-        p.files.put("default", o);
-        p.contentTypes.put("default", ContentType.create("text/json"));
-        return p;
-    }
+        public PostBuilder enableMultipart() {
+            isMultipart = true;
+            return this;
+        }
 
-    public Post withFile(String key, File f) {
-        Post p = new Post(this);
-        p.files.put(key, f);
-        return p;
-    }
+        public PostBuilder addHeader(String key, String value) {
+            headers.put(key, value);
+            return this;
+        }
 
-    public Post withFile(File f, String mimeType) {
-        Post p = new Post(this);
-        p.files.put("default", f);
-        p.contentTypes.put("default", ContentType.create(mimeType));
-        return p;
-    }
+        public PostBuilder addParam(String key, String value) {
+            uriBuilder.addParameter(key, value);
+            return this;
+        }
 
-    public JSONObject json() {
-        String str = response();
-        if (str == null) return null;
-        return new JSONObject(str);
-    }
+        public PostBuilder addData(String key, String value) {
+            data.put(key, value);
+            return this;
+        }
 
-    public String response() {
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            List<NameValuePair> queryParams = new ArrayList<>();
-            params.forEach((k, v) -> {
-                queryParams.add(new BasicNameValuePair(k, v));
+        public PostBuilder addData(HashMap<String, String> data) {
+            data.forEach((k, v) -> {
+                addData(k, v);
             });
-            HttpPost post = new HttpPost(url + "?" + URLEncodedUtils.format(queryParams, "UTF-8"));
-            if (isMultipart) {
-                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-                data.forEach((k, v)-> {
-                    builder.addTextBody(k, v);
-                });
-                files.forEach((k, v)-> {
-                    if (v instanceof File) {
-                        builder.addBinaryBody(k, (File) v);
-                    } else {
-                        builder.addTextBody(k, ((JSONObject)v).toString());
-                    }
-                });
-                post.setEntity(builder.build());
-            } else {
-                if (files.size() == 0) {
-                    List<NameValuePair> params = new ArrayList<>();
-                    data.forEach((k, v) -> {
-                        params.add(new BasicNameValuePair(k, v));
+            return this;
+        }
+
+        public PostBuilder setBody(JSONObject o) {
+            files.put("default", o);
+            contentTypes.put("default", ContentType.create("text/json"));
+            return this;
+        }
+
+        public PostBuilder setFile(String key, File f) {
+            files.put(key, f);
+            return this;
+        }
+
+        public PostBuilder setFile(File f, String mimeType) {
+            files.put("default", f);
+            contentTypes.put("default", ContentType.create(mimeType));
+            return this;
+        }
+
+        HttpPost create() {
+            try {
+                HttpPost post = new HttpPost(uriBuilder.build());
+                if (isMultipart) {
+                    MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+                    data.forEach((key, value) -> {
+                        builder.addTextBody(key, value);
                     });
-                    post.setEntity(new UrlEncodedFormEntity(params));
-                } else {
-                    String key = files.keySet().toArray(new String[]{})[0];
-                    Object value = files.get(key);
-                    if (value instanceof File) {
-                        if (contentTypes.get(key) == null) {
-                            post.setEntity(new FileEntity((File) value));
+                    files.forEach((k, v) -> {
+                        if (v instanceof File) {
+                            builder.addBinaryBody(k, (File) v);
                         } else {
-                            post.setEntity(new FileEntity((File) value, contentTypes.get(key)));
+                            builder.addTextBody(k, ((JSONObject) v).toString());
                         }
+                    });
+                    post.setEntity(builder.build());
+                } else {
+                    if (files.size() == 0) {
+                        post.setEntity(new UrlEncodedFormEntity(data.entrySet().stream().map(entry -> {
+                            return new BasicNameValuePair(entry.getKey(), entry.getValue());
+                        }).collect(Collectors.toList())));
                     } else {
-                        post.setEntity(new StringEntity(((JSONObject) value).toString()));
+                        String key = files.keySet().toArray(new String[]{})[0];
+                        Object value = files.get(key);
+                        if (value instanceof File) {
+                            if (contentTypes.get(key) == null) {
+                                post.setEntity(new FileEntity((File) value));
+                            } else {
+                                post.setEntity(new FileEntity((File) value, contentTypes.get(key)));
+                            }
+                        } else {
+                            post.setEntity(new StringEntity(((JSONObject) value).toString()));
+                        }
                     }
                 }
-            }
 
-            if (timeout != -1) {
-                RequestConfig requestConfig = RequestConfig.custom()
-                        .setSocketTimeout(timeout * 1000)
-                        .setConnectTimeout(timeout * 1000)
-                        .build();
-                post.setConfig(requestConfig);
-            }
+                headers.forEach((k, v) -> {
+                    post.addHeader(k, v);
+                });
 
-            headers.forEach((k, v) -> {
-               post.addHeader(k, v);
-            });
-
-            try (CloseableHttpResponse response = client.execute(post)) {
-                if (response.getStatusLine().getStatusCode() != 200) {
-                    EntityUtils.consume(response.getEntity());
-                    return null;
-                }
-                HttpEntity entity = response.getEntity();
-                if (entity != null) {
-                    return EntityUtils.toString(entity);
-                }
-                return null;
+                return post;
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
+        }
+
+        public Post build() {
+            return new Post(this);
         }
     }
 }

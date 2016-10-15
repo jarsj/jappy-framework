@@ -85,7 +85,7 @@ public class LogTest {
         File logFolder = new File(temp, "log" + System.currentTimeMillis());
         logFolder.mkdir();
         System.out.println(logFolder.getAbsolutePath());
-        Log.getRoot().appender(Appender.create("file").folder(logFolder.getAbsolutePath()).level("test", Level.INFO));
+        Log.getRoot().appender(Appender.create("file").folder(logFolder.getAbsolutePath()).level(Level.INFO));
         runTest("File Appender DEBUG", (Integer i) -> {
             LOG.debug("SHIT HAPPENED {}", i);
         });
@@ -95,7 +95,7 @@ public class LogTest {
         });
         // Now with logging.
         Log.getRoot().clear();
-        Log.getRoot().appender(Appender.create("file").folder(logFolder.getAbsolutePath()).level("test", Level.INFO).async());
+        Log.getRoot().appender(Appender.create("file").folder(logFolder.getAbsolutePath()).level(Level.INFO).async());
         runTest("File Appender ASYNC", (Integer i) -> {
             LOG.info("SHIT HAPPENED {}", i);
         });
