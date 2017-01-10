@@ -1,6 +1,6 @@
 package com.crispy.database;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +17,10 @@ public class Where {
     private String function;
     private Value value[];
     private ArrayList<Where> children;
+
+    public static Where in() {
+        return operator(WhereOp.IN);
+    }
 
     public static Where equals() {
         return operator(WhereOp.EQUALS);
@@ -141,7 +145,9 @@ public class Where {
         if (children != null) {
             List<String> childExps = new ArrayList<>();
             for (Where child : children) {
-                childExps.add(child.exp());
+                String exp = child.exp();
+                if (exp != null)
+                    childExps.add(child.exp());
             }
             return "(" + StringUtils.join(childExps, " " + op.sqlOp + " ") + ")";
         }
@@ -155,6 +161,8 @@ public class Where {
                 return StringUtils.join(Collections.nCopies(value.length, leftExpr() + op.sqlOp + "?"), " AND ");
             case IN:
             case NOT_IN:
+                if (value.length == 0)
+                    return null;
                 return leftExpr() + " " + op.sqlOp + " (" + StringUtils.join(Collections.nCopies
                         (value.length,
                         "?"), ",") + ")";

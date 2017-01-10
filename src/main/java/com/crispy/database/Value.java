@@ -158,6 +158,8 @@ public class Value {
 
     public Timestamp asTimestamp() {
         Instant i = asInstant();
+        if (i == null)
+            return null;
         return Timestamp.from(i);
     }
 

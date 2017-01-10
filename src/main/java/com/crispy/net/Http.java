@@ -75,7 +75,7 @@ public class Http implements Closeable {
                     }
                 });
                 callback.accept(resp);
-            } catch (IOException e) {
+            } catch (Throwable t) {
                 callback.accept(null);
             }
         };
@@ -129,6 +129,11 @@ public class Http implements Closeable {
 
         public HttpBuilder setAsync(int threads) {
             this.numThreads = threads;
+            return this;
+        }
+
+        public HttpBuilder setMaxConnections(int m) {
+            builder.setMaxConnTotal(m);
             return this;
         }
 

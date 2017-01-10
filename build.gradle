@@ -18,7 +18,7 @@
 def isMvnCentral
 group = 'com.jappyframework'
 archivesBaseName = "jappy-framework"
-version = '5.5.0'
+version = '5.7.7'
 
 if (hasProperty("mvncentral")) {
     isMvnCentral = mvncentral
@@ -32,10 +32,10 @@ repositories {
 dependencies {
     compile 'joda-time:joda-time:2.9.4'
     compile 'com.google.protobuf:protobuf-java:2.6.1'
-    compile 'org.freemarker:freemarker:2.3.23'
+    compile 'org.freemarker:freemarker:2.3.25-incubating'
     compile 'com.amazonaws:aws-java-sdk:1.9.16'
     compile 'commons-io:commons-io:2.4'
-    compile 'commons-lang:commons-lang:2.6'
+    compile 'org.apache.commons:commons-lang3:3.4'
     compile 'org.apache.httpcomponents:httpclient:4.5.1'
     compile 'org.apache.httpcomponents:httpmime:4.5.1'
     compile 'commons-dbcp:commons-dbcp:1.4'
@@ -48,10 +48,11 @@ dependencies {
     compile 'javax.mail:javax.mail-api:1.5.2'
     compile 'com.sun.mail:javax.mail:1.5.2'
     compile 'com.maxmind.geoip2:geoip2:2.3.0'
-    compile 'org.apache.tomcat.embed:tomcat-embed-logging-juli:8.0.21'
-    compile 'org.apache.tomcat.embed:tomcat-embed-logging-log4j:8.0.21'
-    compile 'org.apache.tomcat.embed:tomcat-embed-websocket:8.0.21'
-    compile 'org.apache.tomcat.embed:tomcat-embed-core:8.0.21'
+    compile 'org.apache.tomcat.embed:tomcat-embed-logging-juli:8.0.38'
+    compile 'org.apache.tomcat.embed:tomcat-embed-logging-log4j:8.0.38'
+    compile 'org.apache.tomcat.embed:tomcat-embed-websocket:8.0.38'
+    compile 'org.apache.tomcat.embed:tomcat-embed-core:8.0.38'
+    compile 'com.googlecode.protobuf-java-format:protobuf-java-format:1.4'
     compile 'io.dropwizard.metrics:metrics-core:3.1.0'
     testCompile "junit:junit:4.11"  // Or whatever version
 }

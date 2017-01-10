@@ -37,6 +37,11 @@ public class Params {
         return ret;
     }
 
+    public void removeKeys(String ... keys) {
+        for (String key : keys)
+            values.remove(key);
+    }
+
     public static Params withRequest(HttpServletRequest request) {
         Params p = new Params();
         try {
@@ -56,6 +61,12 @@ public class Params {
 
     public Object get(String name) {
         return values.get(name);
+    }
+
+    public String getString(String name, String def) {
+        String s = getString(name);
+        if (s == null) return def;
+        return s;
     }
 
     public String getString(String name) {

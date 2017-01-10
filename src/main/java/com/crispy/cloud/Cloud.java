@@ -78,6 +78,11 @@ public class Cloud {
 		System.setProperty("com.amazonaws.sdk.disableCertChecking", "true");
 	}
 
+	public static void init(String accessKey, String secretKey) {
+		credentials = new BasicAWSCredentials(accessKey, secretKey);
+		System.setProperty("com.amazonaws.sdk.disableCertChecking", "true");
+	}
+
 	private static String defaultSecurityGroup = null;
 	private static String defaultKeyPair = null;
 
@@ -292,8 +297,24 @@ public class Cloud {
 		s3.shutdown();
 	}
 
+	public Cloud upload(String key, String data, String contentType, String contentEncoding) throws
+			UnsupportedEncodingException {
+		ObjectMetadata metadata = new ObjectMetadata();
+		metadata.setContentType(contentType);
+		metadata.setContentEncoding(contentEncoding);
+		PutObjectRequest request = new PutObjectRequest(bucket, key, new StringInputStream(data), metadata);
+		if (acl != null) {
+			request = request.withAccessControlList(acl);
+		}
+		s3.putObject(request);
+		return this;
+	}
+
 	public Cloud upload(String key, String data) throws UnsupportedEncodingException {
 		PutObjectRequest request = new PutObjectRequest(bucket, key, new StringInputStream(data), new ObjectMetadata());
+		if (acl != null) {
+			request = request.withAccessControlList(acl);
+		}
 		s3.putObject(request);
 		return this;
 	}

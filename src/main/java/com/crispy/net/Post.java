@@ -122,6 +122,7 @@ public class Post {
         HttpPost create() {
             try {
                 HttpPost post = new HttpPost(uriBuilder.build());
+
                 if (isMultipart) {
                     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                     data.forEach((key, value) -> {

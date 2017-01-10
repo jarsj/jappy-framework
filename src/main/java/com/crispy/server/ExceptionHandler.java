@@ -6,13 +6,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Created by harsh on 11/18/15.
+ * Created by harsh on 1/7/17.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface GetMethod {
-    String path() default "";
-    String server() default "";
-    String template() default "";
-    boolean utf8() default true;
+public @interface ExceptionHandler {
 }

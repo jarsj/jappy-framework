@@ -67,16 +67,7 @@ public class DB {
         bds.close();
     }
 
-
-    /**
-     * Initialize DB. If database doesn't exist it's created
-     *
-     * @param host
-     * @param database
-     * @param user
-     * @param password
-     */
-    public static void init(String host, String database, String user, String password) {
+    public static void init(String host, String database, String user, String password, int maxConnections) {
         if (INSTANCE.mDS != null) {
             try {
                 INSTANCE.mDS.close();
@@ -89,6 +80,7 @@ public class DB {
         bds.setDriverClassName("com.mysql.jdbc.Driver");
         bds.setUrl("jdbc:mysql://" + host + "/" + database + "?zeroDateTimeBehavior=convertToNull");
         bds.setUsername(user);
+        bds.setMaxActive(maxConnections);
         bds.setPassword(password);
         bds.setTestOnBorrow(true);
         bds.setValidationQuery("SELECT 1");
@@ -98,6 +90,18 @@ public class DB {
                 .columns(Column.text("table", 100),
                         Column.mediumtext("metadata")).primary("table")
                 .create();
+    }
+
+    /**
+     * Initialize DB. If database doesn't exist it's created
+     *
+     * @param host
+     * @param database
+     * @param user
+     * @param password
+     */
+    public static void init(String host, String database, String user, String password) {
+        init(host, database, user, password, 8);
     }
 
     public static void init(String database, String user, String password) {

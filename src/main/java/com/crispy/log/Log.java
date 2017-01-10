@@ -132,17 +132,16 @@ public class Log {
 				}
 			}
 
-			policy.start();
-
 			if (appender.size != null) {
 				SizeAndTimeBasedFNATP<ILoggingEvent> satb = new SizeAndTimeBasedFNATP<ILoggingEvent>();
 				satb.setMaxFileSize(appender.size);
 				satb.setContext(logger.getLoggerContext());
 				satb.setTimeBasedRollingPolicy(policy);
-				satb.start();
 
 				policy.setTimeBasedFileNamingAndTriggeringPolicy(satb);
 			}
+
+			policy.start();
 
 			((RollingFileAppender<ILoggingEvent>) ret).setRollingPolicy(policy);
 		}

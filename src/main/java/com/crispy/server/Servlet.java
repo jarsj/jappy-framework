@@ -4,12 +4,14 @@ import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.crispy.log.Log;
+import com.crispy.template.Template;
 import com.google.protobuf.Message;
+import com.googlecode.protobuf.format.JsonFormat;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.math.DoubleRange;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+
 import org.json.JSONObject;
 
 import javax.servlet.ServletConfig;
@@ -18,9 +20,11 @@ import javax.servlet.http.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,6 +43,7 @@ public class Servlet extends HttpServlet {
      */
     private MethodSpec[] getMethods;
     private MethodSpec[] postMethods;
+    private MethodSpec exceptionMethod;
     private ConcurrentHashMap<String, String> serverAliases;
 
     private Meter mRequests;
@@ -50,27 +55,6 @@ public class Servlet extends HttpServlet {
             }
         }
         return null;
-    }
-
-    private static Object getRequestParameter(HttpServletRequest req, JSONObject jsonInput, boolean isMultipart, String
-            name) throws IOException, ServletException {
-        if (isMultipart) {
-            Part part = req.getPart(name);
-            if (part == null)
-                return null;
-            String fileName = getFileName(part);
-            if (fileName == null) {
-                return IOUtils.toString(part.getInputStream());
-            } else {
-                File temp = File.createTempFile("tmp", "." + FilenameUtils.getExtension(fileName));
-                part.write(temp.getAbsolutePath());
-                return temp;
-            }
-        } else if (jsonInput != null) {
-            return jsonInput.optString(name, null);
-        } else {
-            return req.getParameter(name);
-        }
     }
 
     private MethodSpec[] methodsForAnnotation(Class<? extends Annotation> c) {
@@ -90,10 +74,16 @@ public class Servlet extends HttpServlet {
         super.init(config);
         getMethods = methodsForAnnotation(GetMethod.class);
         postMethods = methodsForAnnotation(PostMethod.class);
+        MethodSpec temp[] = methodsForAnnotation(ExceptionHandler.class);
+        if (temp.length > 1)
+            throw new ServletException("Only one exception handler is supported");
+        if (temp.length > 0) {
+            exceptionMethod = temp[0];
+        }
         serverAliases = new ConcurrentHashMap<>();
 
         MetricRegistry registry = getMetricRegistry();
-        mRequests = registry.meter(getClass().getName() + ".requests");
+        mRequests = registry.meter(getClass().getName().toLowerCase() + ".requests");
     }
 
     protected void addServerAlias(String alias, String serverName) {
@@ -121,8 +111,6 @@ public class Servlet extends HttpServlet {
         String path = req.getPathInfo();
         String[] pathComponents = StringUtils.split(path, "/");
 
-        Params params = Params.withRequest(req);
-
         MethodSpec matching = null;
 
         for (int m = 0; m < methods.length; m++) {
@@ -147,6 +135,16 @@ public class Servlet extends HttpServlet {
             resp.sendError(404);
             return;
         }
+
+        if (matching.utf8) {
+            req.setCharacterEncoding("UTF-8");
+        }
+
+        Params params = Params.withRequest(req);
+
+        String mFormat = params.getString("_format", null);
+        String mPretty = params.getString("_pretty", null);
+        params.removeKeys("_format", "_pretty");
 
         LOG.debug("matched method " + matching.method.getName());
 
@@ -205,23 +203,70 @@ public class Servlet extends HttpServlet {
             // It's possible for methods to directly write to response or sendError/Redirects. In
             // which case it's an
             if (!resp.isCommitted()) {
+                if (out == null && matching.templateName != null) {
+                    throw new ServletException("Can not expand template " + matching.templateName + " as null was " +
+                            "returned");
+                }
                 if (out != null) {
+                    if (matching.utf8)
+                        resp.setCharacterEncoding("UTF-8");
                     if (out instanceof Message) {
-                        byte data[] = ((Message) out).toByteArray();
-                        resp.setContentType("application/x-protobuf");
-                        resp.setContentLength(data.length);
-                        resp.getOutputStream().write(data);
-                        resp.getOutputStream().flush();
+                        Message mOut = (Message) out;
+                        if (Objects.equals(mFormat, "json")) {
+                            resp.setContentType("application/json");
+                            new JsonFormat().print(mOut, resp.getOutputStream());
+                            resp.getOutputStream().flush();
+                        } else {
+                            if (matching.templateName != null) {
+                                JSONObject data = new JSONObject(new JsonFormat().printToString(mOut));
+                                String content = Template.byName(matching.templateName).expand(data);
+                                resp.getWriter().write(content);
+                                resp.getWriter().flush();
+                            } else {
+                                byte data[] = ((Message) out).toByteArray();
+                                resp.setContentType("application/x-protobuf");
+                                resp.setContentLength(data.length);
+                                resp.getOutputStream().write(data);
+                                resp.getOutputStream().flush();
+                            }
+                        }
+                    } else if (out instanceof JSONObject) {
+
+                        if (Objects.equals(mFormat, "json") || matching.templateName == null) {
+                            if (mPretty == null) {
+                                resp.getWriter().write(out.toString());
+                            } else {
+                                resp.getWriter().write(((JSONObject) out).toString(2));
+                            }
+                            resp.getWriter().flush();
+                        } else {
+                            JSONObject data = (JSONObject) out;
+                            String content = Template.byName(matching.templateName).expand(data);
+                            resp.getWriter().write(content);
+                            resp.getWriter().flush();
+                        }
                     } else if (out instanceof byte[]) {
                         resp.getOutputStream().write((byte[]) out);
                         resp.getOutputStream().flush();
                     } else {
+                        resp.setCharacterEncoding("UTF-8");
                         resp.getWriter().write(out.toString());
                         resp.getWriter().flush();
                     }
                 }
             }
+        } catch (InvocationTargetException e) {
+            LOG.error("domethod name=" + matching.method.getName() + " args=" + ArrayUtils.toString(args));
+            if (exceptionMethod != null) {
+                try {
+                    exceptionMethod.method.invoke(this, e.getTargetException(), req, resp);
+                } catch (Throwable t) {
+                    throw new ServletException(t);
+                }
+            }
         } catch (Exception e) {
+            LOG.error("domethod name=" + matching.method.getName() + " args=" + ArrayUtils.toString(args));
+
             throw new ServletException(e);
         }
     }
@@ -275,10 +320,13 @@ public class Servlet extends HttpServlet {
         String[] args;
         ParamType[] argTypes;
         int[] argLocationInPath;
+        String templateName;
 
         String serverName;
+        boolean utf8;
 
         MethodSpec(Method m) {
+            utf8 = true;
             String path = null;
             serverName = null;
             {
@@ -288,8 +336,11 @@ public class Servlet extends HttpServlet {
                     serverName = annt.server();
                     if (serverName.equals(""))
                         serverName = null;
+                    templateName = annt.template();
+                    if (templateName.equals(""))
+                        templateName = null;
+                    utf8 = annt.utf8();
                 }
-
             }
             {
                 PostMethod annt = m.getAnnotation(PostMethod.class);
@@ -298,9 +349,19 @@ public class Servlet extends HttpServlet {
                     serverName = annt.server();
                     if (serverName.equals(""))
                         serverName = null;
+                    templateName = annt.template();
+                    if (templateName.equals(""))
+                        templateName = null;
+                    utf8 = annt.utf8();
                 }
             }
 
+            if (templateName != null &&
+                    !(JSONObject.class.isAssignableFrom(m.getReturnType())
+                    || Message.class.isAssignableFrom(m.getReturnType()))) {
+                throw new IllegalArgumentException("Methods using template must return a JSONObject or a Protocol " +
+                        "Buffer");
+            }
 
             pathComponents = StringUtils.split(path, '/');
 

@@ -1,8 +1,8 @@
 package com.crispy.database;
 
 import com.crispy.log.Log;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -291,6 +291,7 @@ public class Select {
         Connection con = DB.getConnection();
         try {
             PreparedStatement pstmt = createSelectStatement(con);
+            LOG.debug("query = {}", pstmt.toString());
             Rows ret = new Rows();
             ResultSet results = pstmt.executeQuery();
             while (results.next()) {
@@ -317,6 +318,7 @@ public class Select {
         Connection con = DB.getConnection();
         try {
             PreparedStatement pstmt = createSelectStatement(con);
+            LOG.debug("query = {}", pstmt.toString());
             Row ret = null;
             ResultSet results = pstmt.executeQuery();
             if (results.next())

@@ -1,6 +1,5 @@
 package com.crispy.server;
 
-import com.crispy.utils.Pair;
 import org.apache.catalina.*;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.servlets.DefaultServlet;
@@ -147,6 +146,8 @@ public class Server {
         File ctxtDir = new File(docBase, baseDir);
         Context ctx = tomcat.addContext("", ctxtDir.getAbsolutePath());
         ctx.addApplicationListener(Config.class.getName());
+        ctx.addMimeMapping("svg", "image/svg+xml");
+
         if (this.welcomeFile != null)
             ctx.addWelcomeFile(welcomeFile);
 
@@ -163,7 +164,10 @@ public class Server {
 
         for (Class<? extends HttpServlet> servlet : mServlets) {
             WebServlet annotation = servlet.getAnnotation(WebServlet.class);
-            Wrapper wrapper = Tomcat.addServlet(ctx, servlet.getSimpleName(), servlet.newInstance());
+            String name = annotation.name();
+            if (name.length() == 0)
+                name = servlet.getSimpleName();
+            Wrapper wrapper = Tomcat.addServlet(ctx, name, servlet.newInstance());
             if (mInitParams.containsKey(servlet)) {
                 mInitParams.get(servlet).forEach((k, v) -> {
                     wrapper.addInitParameter(k, v);
@@ -176,19 +180,25 @@ public class Server {
             }
             wrapper.setLoadOnStartup(annotation.loadOnStartup());
             for (String url : annotation.urlPatterns()) {
-                ctx.addServletMapping(url, servlet.getSimpleName());
+                ctx.addServletMapping(url, name);
             }
         }
         for (ServletInfo info : mServletObjects) {
-            // WebServlet annotation = servlet.getClass().getAnnotation(WebServlet.class);
-            Wrapper wrapper = Tomcat.addServlet(ctx, info.servlet.getClass().getSimpleName(), info.servlet);
+            WebServlet annotation = info.servlet.getClass().getAnnotation(WebServlet.class);
+            String name = "";
+            if (annotation != null)
+                name = annotation.name();
+            if (name.length() == 0)
+                name = info.servlet.getClass().getSimpleName();
+
+            Wrapper wrapper = Tomcat.addServlet(ctx, name, info.servlet);
             if (info.isMultipart) {
                 MultipartConfigElement config = new MultipartConfigElement("/tmp");
                 wrapper.setMultipartConfigElement(config);
             }
             wrapper.setLoadOnStartup(info.loadOrder);
             for (String url : info.urls) {
-                ctx.addServletMapping(url, info.servlet.getClass().getSimpleName());
+                ctx.addServletMapping(url, name);
             }
         }
 

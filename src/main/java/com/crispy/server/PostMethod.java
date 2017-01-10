@@ -13,4 +13,6 @@ import java.lang.annotation.Target;
 public @interface PostMethod {
     String path() default "";
     String server() default "";
+    String template() default "";
+    boolean utf8() default true;
 }

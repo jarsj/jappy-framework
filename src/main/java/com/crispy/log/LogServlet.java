@@ -10,7 +10,7 @@ import javax.servlet.annotation.WebServlet;
 /**
  * Created by harsh on 5/26/16.
  */
-@WebServlet(urlPatterns = "/jappy/log/*")
+@WebServlet(urlPatterns = "/jappy/log/*", name = "JappyLogServlet")
 public class LogServlet extends Servlet {
 
     @GetMethod(path = "/change")

@@ -63,6 +63,10 @@ public class Column {
 		return new Column(name, "BLOB");
 	}
 
+	public static Column timestampWithNull(String name) {
+		Column c = new Column(name, "TIMSTAMP");
+		return c;
+	}
 
 	public static Column timestamp(String name, boolean def) {
 		Column c = new Column(name, "TIMESTAMP");
