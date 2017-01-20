@@ -31,6 +31,45 @@ public class TableTests {
     }
 
     @Test
+    public void testTripleJoin() throws SQLException {
+        Table.get("course").columns(Column.bigInteger("id", true),
+                Column.text("name", 128)).create();
+
+        Table.get("lecture").columns(Column.bigInteger("id", true),
+                Column.bigInteger("course"),
+                Column.text("name", 128))
+                .constraints(Constraint.create("course", "course", "id"))
+                .create();
+
+        Table.get("user").columns(Column.bigInteger("id", true), Column.text("name", 128)).create();
+
+        Table.get("schedule").columns(Column.bigInteger("id", true),
+                Column.bigInteger("lecture"),
+                Column.bigInteger("userid"),
+                Column.integer("duration"))
+                .constraints(
+                        Constraint.create("userid", "user", "id"),
+                        Constraint.create("lecture", "lecture", "id"))
+                .create();
+
+        Insert.withTable("course").object("id", 1).object("name", "Java").execute();
+        Insert.withTable("lecture").object("id", 1).object("name", "Basics").object("course", 1).execute();
+        Insert.withTable("lecture").object("id", 2).object("name", "Advanced").object("course", 1).execute();
+        for (int i = 1; i <= 5; i++) {
+            Insert.withTable("user").object("id", i).object("name", "boo " + i).execute();
+        }
+
+        for (int i = 0; i < 5; i++) {
+            Insert.withTable("schedule").object("userid", i + 1).object("lecture", 1).object("duration", 10).execute();
+        }
+        for (int i = 0; i < 5; i++) {
+            Insert.withTable("schedule").object("userid", i + 1).object("lecture", 2).object("duration", 10).execute();
+        }
+
+        assertEquals(10, Select.withTable("user", "course", "lecture", "schedule").rows().getRows().size());
+    }
+
+    @Test
     public void testSimple() throws SQLException {
         Table.get("person")
                 .columns(Column.bigInteger("id", true),

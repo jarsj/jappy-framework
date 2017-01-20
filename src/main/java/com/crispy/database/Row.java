@@ -79,7 +79,7 @@ public class Row {
         } else {
             String first = key.substring(0, dot);
             String second = key.substring(dot + 1);
-            if (!o.has(first)) {
+            if (!(o.has(first) && (o.get(first) instanceof JSONObject))) {
                 o.put(first, new JSONObject());
             }
             put(o.getJSONObject(first), second, value);

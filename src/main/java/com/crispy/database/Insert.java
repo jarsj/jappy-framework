@@ -125,10 +125,9 @@ public class Insert {
         validate();
         Connection con = DB.getConnection();
         try {
-            String q = createQuery();
-            LOG.debug(q);
-            PreparedStatement pstmt = con.prepareStatement(q);
+            PreparedStatement pstmt = con.prepareStatement(createQuery());
             setValues(pstmt);
+            LOG.debug("query = {}", pstmt.toString());
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException(e);
@@ -147,6 +146,7 @@ public class Insert {
         try {
             PreparedStatement pstmt = con.prepareStatement(createQuery(), Statement.RETURN_GENERATED_KEYS);
             setValues(pstmt);
+            LOG.debug("query = {}", pstmt.toString());
             pstmt.executeUpdate();
             Row ret = null;
             try {

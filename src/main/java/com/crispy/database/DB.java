@@ -333,6 +333,53 @@ public class DB {
         return new ArrayList<Metadata>(INSTANCE.tables.values());
     }
 
+    public static Row row(String sql, Object ... args) {
+        Connection con = getConnection();
+        try {
+            PreparedStatement pstmt = con.prepareStatement(sql);
+            for (int i = 0; i < args.length; i++) {
+                pstmt.setObject(i + 1, args[i]);
+            }
+            ResultSet results = pstmt.executeQuery();
+            if (results.next()) {
+                return new Row(results);
+            }
+            return null;
+        } catch (SQLException e) {
+            throw new IllegalArgumentException("Illegal argument exception", e);
+        } finally {
+            try {
+                con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static Rows rows(String sql, Object ... args) {
+        Rows rows = new Rows();
+        Connection con = DB.getConnection();
+        try {
+            PreparedStatement pstmt = con.prepareStatement(sql);
+            for (int i = 0; i < args.length; i++) {
+                pstmt.setObject(i + 1, args[i]);
+            }
+            ResultSet results = pstmt.executeQuery();
+            while (results.next()) {
+                rows.addRow(new Row(results));
+            }
+            pstmt.close();
+            return rows;
+        } catch (SQLException e) {
+            throw new IllegalArgumentException("Check your query", e);
+        } finally {
+            try {
+                con.close();
+            } catch (Exception e) {
+            }
+        }
+    }
+
     public static JSONArray query(String sql, Function<ResultSet, JSONObject> fn, Object ... args) {
         JSONArray ret = new JSONArray();
         Connection con = DB.getConnection();

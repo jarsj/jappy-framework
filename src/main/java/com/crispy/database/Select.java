@@ -176,6 +176,23 @@ public class Select {
         return this;
     }
 
+    public Select fetchEverythingWithTablePrefix(String... ignore) {
+        for (String t : tables) {
+            fetchFromTableWithPrefix(t, t, ignore);
+        }
+        return this;
+    }
+
+    public Select fetchFromTableWithPrefix(String table, String prefix, String... ignore) {
+        for (String col : DB.getMetadata(table).columnNames()) {
+            if (!ArrayUtils.contains(ignore, col)) {
+                columnExprs.add("`" + table + "`.`" + col + "`");
+                columnAliases.add("`" + prefix + "." + col + "`");
+            }
+        }
+        return this;
+    }
+
     public Select fetchFromTable(String table, String... ignore) {
         for (String col : DB.getMetadata(table).columnNames()) {
             if (!ArrayUtils.contains(ignore, col)) {

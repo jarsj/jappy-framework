@@ -263,6 +263,8 @@ public class Servlet extends HttpServlet {
                 } catch (Throwable t) {
                     throw new ServletException(t);
                 }
+            } else {
+                throw new ServletException(e);
             }
         } catch (Exception e) {
             LOG.error("domethod name=" + matching.method.getName() + " args=" + ArrayUtils.toString(args));
