@@ -37,6 +37,8 @@ public class Select {
     private ArrayList<String> orderBy;
     private ArrayList<String> groupBy;
 
+    private ArrayList<String> joinConditions;
+
     private Select() {
         this.tables = new ArrayList<>();
         this.columnExprs = new ArrayList<>();
@@ -69,6 +71,13 @@ public class Select {
 
     public Select rightJoin() {
         joinType = JoinType.RIGHT;
+        return this;
+    }
+
+    public Select join(String fromTable, String fromColumn, String toTable, String toColumn) {
+        if (joinConditions == null)
+            joinConditions = new ArrayList<>();
+        joinConditions.add("`" + fromTable + "`.`" + fromColumn + "`=`" + toTable + "`.`" + toColumn + "`");
         return this;
     }
 
@@ -187,7 +196,7 @@ public class Select {
         for (String col : DB.getMetadata(table).columnNames()) {
             if (!ArrayUtils.contains(ignore, col)) {
                 columnExprs.add("`" + table + "`.`" + col + "`");
-                columnAliases.add("`" + prefix + "." + col + "`");
+                columnAliases.add(prefix + "." + col);
             }
         }
         return this;
@@ -229,7 +238,7 @@ public class Select {
                 if (alias.length() == 0) {
                     sb.append(expr);
                 } else {
-                    sb.append(expr + " AS " + alias);
+                    sb.append(expr + " AS `" + alias + "`");
                 }
                 if (i < columnExprs.size() - 1) {
                     sb.append(", ");
@@ -245,21 +254,23 @@ public class Select {
         if (tables.size() > 1) {
             sb.append(" ON ");
 
-            ArrayList<String> joinCondition = new ArrayList<String>();
-            for (int t = 0; t < tables.size() - 1; t++) {
-                String t1 = tables.get(t);
-                String t2 = tables.get(t + 1);
-                Metadata m1 = DB.getMetadata(t1);
-                Metadata m2 = DB.getMetadata(t2);
+            if (joinConditions == null) {
+                joinConditions = new ArrayList<String>();
+                for (int t = 0; t < tables.size() - 1; t++) {
+                    String t1 = tables.get(t);
+                    String t2 = tables.get(t + 1);
+                    Metadata m1 = DB.getMetadata(t1);
+                    Metadata m2 = DB.getMetadata(t2);
 
-                Constraint c = Constraint.to(m1.constraints, t2);
-                if (c == null)
-                    c = Constraint.to(m2.constraints, t1);
+                    Constraint c = Constraint.to(m1.constraints, t2);
+                    if (c == null)
+                        c = Constraint.to(m2.constraints, t1);
 
-                joinCondition.add("`" + c.sourceTable + "`.`" + c.sourceColumn + "`=`" + c.destTable + "`.`" + c
-                        .destColumn + "`");
+                    joinConditions.add("`" + c.sourceTable + "`.`" + c.sourceColumn + "`=`" + c.destTable + "`.`" + c
+                            .destColumn + "`");
+                }
             }
-            sb.append("(" + StringUtils.join(joinCondition, " AND ") + ")");
+            sb.append("(" + StringUtils.join(joinConditions, " AND ") + ")");
         }
 
         whereStatement(sb);

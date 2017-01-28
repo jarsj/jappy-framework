@@ -42,6 +42,10 @@ public class Rows {
         return rows.stream().map(r -> r.byName(name).asInt()).collect(Collectors.toList());
     }
 
+    public List<String> strings(String name) {
+        return rows.stream().map(r -> r.byName(name).asString()).collect(Collectors.toList());
+    }
+
     public Set<Value> unique(int index) {
         Set<Value> ret = new TreeSet<>();
         for (Row row : rows) {
