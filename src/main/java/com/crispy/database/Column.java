@@ -9,12 +9,14 @@ public class Column {
 	String type;
 	String def;
 	boolean autoIncrement;
+	boolean nullable;
 
 	public Column(String name, String type) {
 		this.name = name;
 		this.type = type.toUpperCase();
 		this.def = null;
 		this.autoIncrement = false;
+		this.nullable = true;
 	}
 
 	public String getType() {
@@ -111,6 +113,8 @@ public class Column {
 		StringBuilder sb = new StringBuilder();
 		sb.append("`" + name + "` ");
 		sb.append(type);
+		if (!nullable)
+			sb.append(" NOT NULL");
 		if (def != null) {
 			sb.append(" DEFAULT ");
 			if (type.startsWith("VARCHAR") || type.contains("TEXT")) {
@@ -132,9 +136,17 @@ public class Column {
 	public static Column parseResultSet(ResultSet results) throws SQLException {
 		String columnName = results.getString("COLUMN_NAME").toLowerCase();
 		String type = results.getString("TYPE_NAME").toUpperCase();
+		if (type.equals("CLOB")) {
+			int size = results.getInt("COLUMN_SIZE");
+			int exp = (int) (Math.log(size) / Math.log(2));
+			if (exp == 30) {
+				type = "MEDIUMTEXT";
+			}
+		}
 		Column c = new Column(columnName, type);
 		c.def = results.getString("COLUMN_DEF");
 		c.autoIncrement = results.getString("IS_AUTOINCREMENT").equals("YES");
+		c.nullable = results.getBoolean("IS_NULLABLE");
 
 		if (type.equals("VARCHAR")) {
 			c.type = "VARCHAR(" + results.getInt("COLUMN_SIZE") + ")";
@@ -227,5 +239,13 @@ public class Column {
 
 	public String getDefault() {
 		return def;
+	}
+
+	public void setNullable(boolean nullable) {
+		this.nullable = nullable;
+	}
+
+	public boolean isNullable() {
+		return nullable;
 	}
 }

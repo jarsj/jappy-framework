@@ -42,6 +42,10 @@ public class Where {
         return operator(WhereOp.LESS_THAN_EQUALS);
     }
 
+    public static Where noop() {
+        return operator(WhereOp.TRUE);
+    }
+
     public static Where operator(WhereOp op) {
         Where w = new Where();
         w.op = op;

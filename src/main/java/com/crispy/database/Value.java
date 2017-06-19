@@ -10,6 +10,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.*;
+import java.time.temporal.TemporalAccessor;
 
 /**
  * Created by harsh on 1/5/16.
@@ -84,9 +85,9 @@ public class Value {
         return null;
     }
 
-    public long asLong() {
+    public Long asLong() {
         if (o == null)
-            return (d != null) ? d.asLong() : 0;
+            return (d != null) ? d.asLong() : null;
         if (o instanceof Number)
             return ((Number) o).longValue();
         if (o instanceof Timestamp)
@@ -94,9 +95,9 @@ public class Value {
         return Long.parseLong(o.toString());
     }
 
-    public int asInt() {
+    public Integer asInt() {
         if (o == null)
-            return (d != null) ? d.asInt() : 0;
+            return (d != null) ? d.asInt() : null;
         if (o instanceof Number)
             return ((Number) o).intValue();
         return Integer.parseInt(o.toString());
@@ -113,17 +114,17 @@ public class Value {
         return o.toString();
     }
 
-    public float asFloat() {
+    public Float asFloat() {
         if (o == null)
-            return (d != null) ? d.asFloat() : 0.0f;
+            return (d != null) ? d.asFloat() : null;
         if (o instanceof Number)
             return ((Number) o).floatValue();
         return Float.parseFloat(o.toString());
     }
 
-    public double asDouble() {
+    public Double asDouble() {
         if (o == null)
-            return (d != null) ? d.asDouble() : 0.0;
+            return (d != null) ? d.asDouble() : null;
         if (o instanceof Number)
             return ((Number) o).doubleValue();
         return Double.parseDouble(o.toString());
@@ -169,6 +170,8 @@ public class Value {
         if (o instanceof Number) {
             return Instant.ofEpochMilli(((Number)o).longValue());
         }
+        if (o instanceof LocalDate)
+            return asDateTime().toInstant(ZoneId.systemDefault().getRules().getOffset(Instant.now()));
         if (o instanceof Instant)
             return (Instant) o;
         if (o instanceof Date)

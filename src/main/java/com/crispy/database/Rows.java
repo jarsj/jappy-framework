@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -32,6 +33,11 @@ public class Rows {
 
     public ArrayList<Row> getRows() {
         return rows;
+    }
+
+    public Rows filter(Predicate<Row> f) {
+        rows.removeIf(f.negate());
+        return this;
     }
 
     public List<Long> longs(String name) {

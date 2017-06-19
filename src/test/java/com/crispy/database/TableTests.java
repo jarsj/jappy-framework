@@ -142,9 +142,10 @@ public class TableTests {
                     .execute());
         }
 
-        assertEquals(10, Select.withTable("events").where(Where.equals().column("end").value(LocalDate.of(2015, 07,
+        assertEquals(10L, (long) (Select.withTable("events").where(Where.equals().column("end").value(LocalDate.of(2015,
+                07,
                 01))).count
-                ("total").row().byAlias("total").def(0).asInt());
+                ("total").row().byAlias("total").def(0).asLong()));
 
     }
 
@@ -160,11 +161,11 @@ public class TableTests {
         Insert.withTable("boom").object("a", "chalo").object("b", 20).execute();
 
         assertEquals(2, Select.withTable("boom").where(Where.isNull().column("a")).count("total").row().byAlias
-                ("total").def(0).asInt());
+                ("total").def(0).asInt().intValue());
         assertEquals(1, Select.withTable("boom").where(Where.isNull().column("b")).count("total").row().byAlias
-                ("total").def(0).asInt());
+                ("total").def(0).asInt().intValue());
         assertEquals(3, Select.withTable("boom").where(Where.isNull().not().column("b")).count("total").row().byAlias
-                ("total").def(0).asInt());
+                ("total").def(0).asInt().intValue());
     }
     @Test
     public void testJoins() {
@@ -197,13 +198,13 @@ public class TableTests {
         List<Row> rows = select.orderBy("balance", SortOrder.DESCENDING).rows().getRows();
 
         assertEquals("a", rows.get(0).byName("name").asString());
-        assertEquals(300, rows.get(0).byName("balance").asLong());
+        assertEquals(300, rows.get(0).byName("balance").asLong().intValue());
 
         assertEquals("b", rows.get(1).byName("name").asString());
-        assertEquals(100, rows.get(1).byName("balance").asLong());
+        assertEquals(100, rows.get(1).byName("balance").asLong().intValue());
 
         assertEquals("c", rows.get(2).byName("name").asString());
-        assertEquals(0, rows.get(2).byName("balance").asLong());
+        assertEquals(0, rows.get(2).byName("balance").asLong().intValue());
     }
 
     @Test
@@ -251,16 +252,16 @@ public class TableTests {
         }
 
         // Test IGNORE
-        assertEquals(1, Select.withTable("transactions").count("total").row().byAlias("total").asLong());
+        assertEquals(1, Select.withTable("transactions").count("total").row().byAlias("total").asLong().intValue());
 
         // Test Overwrite
         for (int i = 0; i < 10; i++) {
             insert.object("userid", 1).object("coins", 100 * i).object("diamonds", 0).object("tickets", 0)
                     .object("cash", 0).object("code", "random").object("ts", ts).overwrite("coins").execute();
         }
-        assertEquals(1, Select.withTable("transactions").count("total").row().byAlias("total").asLong());
+        assertEquals(1, Select.withTable("transactions").count("total").row().byAlias("total").asLong().intValue());
         assertEquals(900, Select.withTable("transactions").where(Where.equals().column("userid").value(1)).row()
-                .byName("coins").asLong());
+                .byName("coins").asLong().intValue());
 
         // Test generated ID
         long ID = insert.object("userid", 2).object("coins", 200).executeAndFetch().byIndex(0).asLong();
@@ -272,8 +273,8 @@ public class TableTests {
                 .execute();
         Row r = Select.withTable("transactions").where(Where.equals().column("id").value(ID))
                 .row();
-        assertEquals(1000, r.byName("coins").asLong());
-        assertEquals(200, r.byName("cash").asLong());
+        assertEquals(1000, r.byName("coins").asLong().longValue());
+        assertEquals(200, r.byName("cash").asLong().longValue());
     }
 
     @Test
@@ -302,7 +303,7 @@ public class TableTests {
         assertEquals(10.24, rows.get(0).byName("money").asDouble(), 0.0001);
         assertEquals(10.25f, rows.get(1).byName("money").asFloat(), 0.0001f);
         assertEquals(10.26, rows.get(2).byName("money").asDouble(), 0.0001);
-        assertEquals(11, rows.get(3).byName("money").asInt());
+        assertEquals(11, rows.get(3).byName("money").asInt().intValue());
     }
 
     @After

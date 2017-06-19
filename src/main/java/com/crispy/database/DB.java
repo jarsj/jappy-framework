@@ -6,7 +6,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -20,7 +28,6 @@ public class DB {
     private static DB INSTANCE = new DB();
     private static Log LOG = Log.get("jappy.db");
     private BasicDataSource mDS;
-    private String database;
     private ConcurrentHashMap<String, Metadata> tables;
 
     private DB() {
@@ -67,7 +74,7 @@ public class DB {
         bds.close();
     }
 
-    public static void init(String host, String database, String user, String password, int maxConnections) {
+    public static void init(BasicDataSource ds) {
         if (INSTANCE.mDS != null) {
             try {
                 INSTANCE.mDS.close();
@@ -75,7 +82,15 @@ public class DB {
                 LOG.warn("Connection might not have been closed. Potential leak");
             }
         }
-        INSTANCE.database = database;
+        INSTANCE.mDS = ds;
+
+        Table.get("_metadata")
+                .columns(Column.text("table", 100),
+                        Column.mediumtext("metadata")).primary("table")
+                .create();
+    }
+
+    public static void init(String host, String database, String user, String password, int maxConnections) {
         BasicDataSource bds = new BasicDataSource();
         bds.setDriverClassName("com.mysql.jdbc.Driver");
         bds.setUrl("jdbc:mysql://" + host + "/" + database + "?zeroDateTimeBehavior=convertToNull");
@@ -84,12 +99,8 @@ public class DB {
         bds.setPassword(password);
         bds.setTestOnBorrow(true);
         bds.setValidationQuery("SELECT 1");
-        INSTANCE.mDS = bds;
 
-        Table.get("_metadata")
-                .columns(Column.text("table", 100),
-                        Column.mediumtext("metadata")).primary("table")
-                .create();
+        init(bds);
     }
 
     /**
@@ -112,8 +123,7 @@ public class DB {
         if (INSTANCE.mDS != null) {
             try {
                 INSTANCE.mDS.close();
-                Driver d = DriverManager.getDriver("jdbc:mysql://localhost/"
-                        + INSTANCE.database);
+                Driver d = DriverManager.getDriver(INSTANCE.mDS.getUrl());
                 DriverManager.deregisterDriver(d);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -181,7 +191,7 @@ public class DB {
                     String name = results.getString("INDEX_NAME");
                     if (name.startsWith(m.name + "_"))
                         continue;
-                    if (name.equals("PRIMARY")) {
+                    if (name.equals("PRIMARY") || name.startsWith("primary_key")) {
                         if (m.primary == null)
                             m.primary = new Index(null);
                         m.primary.process(results);

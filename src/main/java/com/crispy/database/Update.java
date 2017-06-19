@@ -57,7 +57,7 @@ public class Update {
             LOG.debug(q);
             PreparedStatement pstmt = con.prepareStatement(q);
             setValues(pstmt);
-
+            LOG.debug("query = {}", pstmt);
             return pstmt.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException(e);

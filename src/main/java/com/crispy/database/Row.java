@@ -1,5 +1,6 @@
 package com.crispy.database;
 
+import com.crispy.JSON;
 import com.crispy.log.Log;
 import org.json.JSONObject;
 
@@ -67,22 +68,10 @@ public class Row {
             String key = columnAlias.get(i);
             if (key == null || key.length() == 0)
                 key = columnNames.get(i);
-            put(ret, key, values.get(i));
+            JSON.put(ret, key, values.get(i).asObject());
         }
         return ret;
     }
 
-    private void put(JSONObject o, String key, Value value) {
-        int dot = key.indexOf('.');
-        if (dot == -1) {
-            o.put(key, value.asObject());
-        } else {
-            String first = key.substring(0, dot);
-            String second = key.substring(dot + 1);
-            if (!(o.has(first) && (o.get(first) instanceof JSONObject))) {
-                o.put(first, new JSONObject());
-            }
-            put(o.getJSONObject(first), second, value);
-        }
-    }
+
 }
