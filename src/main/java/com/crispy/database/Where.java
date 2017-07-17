@@ -143,6 +143,7 @@ public class Where {
             case GREATER_THAN:
             case GREATER_THAN_EQUALS:
             case LESS_THAN:
+            case LIKE:    
             case LESS_THAN_EQUALS:
                 return StringUtils.join(Collections.nCopies(value.length, leftExpr() + op.sqlOp + "?"), " AND ");
             case IN:
