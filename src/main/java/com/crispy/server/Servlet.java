@@ -7,16 +7,17 @@ import com.crispy.log.Log;
 import com.crispy.template.Template;
 import com.google.protobuf.Message;
 import com.googlecode.protobuf.format.JsonFormat;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-
 import org.json.JSONObject;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import javax.servlet.http.Part;
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -25,7 +26,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic Servlet class that uses reflection to dedicate tasks to respective methods.
@@ -44,7 +44,6 @@ public class Servlet extends HttpServlet {
     private MethodSpec[] getMethods;
     private MethodSpec[] postMethods;
     private MethodSpec exceptionMethod;
-    private ConcurrentHashMap<String, String> serverAliases;
 
     private Meter mRequests;
 
@@ -80,14 +79,9 @@ public class Servlet extends HttpServlet {
         if (temp.length > 0) {
             exceptionMethod = temp[0];
         }
-        serverAliases = new ConcurrentHashMap<>();
 
         MetricRegistry registry = getMetricRegistry();
         mRequests = registry.meter(getClass().getName().toLowerCase() + ".requests");
-    }
-
-    protected void addServerAlias(String alias, String serverName) {
-        serverAliases.put(serverName, alias);
     }
 
     @Override
@@ -115,17 +109,8 @@ public class Servlet extends HttpServlet {
 
         for (int m = 0; m < methods.length; m++) {
             MethodSpec spec = methods[m];
-            if (spec.serverName != null) {
-                String lServer = req.getServerName().toLowerCase();
-                String alias = serverAliases.getOrDefault(lServer, lServer);
-                if (!alias.equals(spec.serverName))
-                    continue;
-            }
             if (spec.matches(pathComponents)) {
                 if (matching == null) {
-                    matching = spec;
-                }
-                else if (matching.serverName == null && spec.serverName != null) {
                     matching = spec;
                 }
             }
@@ -174,8 +159,8 @@ public class Servlet extends HttpServlet {
                     args[a] = params;
                     break;
                 }
-                case SERVER: {
-                    args[a] = serverAliases.getOrDefault(req.getServerName(), req.getServerName());
+                case HOSTNAME: {
+                    args[a] = req.getServerName();
                     break;
                 }
                 default: {
@@ -311,7 +296,7 @@ public class Servlet extends HttpServlet {
         RESPONSE,
         SESSION,
         PARAMS,
-        SERVER
+        HOSTNAME
     }
 
     class MethodSpec {
@@ -323,21 +308,15 @@ public class Servlet extends HttpServlet {
         ParamType[] argTypes;
         int[] argLocationInPath;
         String templateName;
-
-        String serverName;
         boolean utf8;
 
         MethodSpec(Method m) {
             utf8 = true;
             String path = null;
-            serverName = null;
             {
                 GetMethod annt = m.getAnnotation(GetMethod.class);
                 if (annt != null) {
                     path = annt.path();
-                    serverName = annt.server();
-                    if (serverName.equals(""))
-                        serverName = null;
                     templateName = annt.template();
                     if (templateName.equals(""))
                         templateName = null;
@@ -348,9 +327,6 @@ public class Servlet extends HttpServlet {
                 PostMethod annt = m.getAnnotation(PostMethod.class);
                 if (annt != null) {
                     path = annt.path();
-                    serverName = annt.server();
-                    if (serverName.equals(""))
-                        serverName = null;
                     templateName = annt.template();
                     if (templateName.equals(""))
                         templateName = null;
@@ -378,10 +354,10 @@ public class Servlet extends HttpServlet {
 
             for (int i = 0; i < P; i++) {
                 session[i] = false;
-                if (params[i].isAnnotationPresent(ServerParam.class)) {
+                if (params[i].isAnnotationPresent(Hostname.class)) {
                     argLocationInPath[i] = -1;
                     args[i] = null;
-                    argTypes[i] = ParamType.SERVER;
+                    argTypes[i] = ParamType.HOSTNAME;
                 } else{
                     Param annP = params[i].getAnnotation(Param.class);
                     Session annS = params[i].getAnnotation(Session.class);

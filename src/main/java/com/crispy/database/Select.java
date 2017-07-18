@@ -10,6 +10,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Created by harsh on 1/18/16.
@@ -34,6 +36,7 @@ public class Select {
     private int start;
     private int limit;
 
+    private ArrayList<String> having;
     private ArrayList<String> orderBy;
     private ArrayList<String> groupBy;
 
@@ -43,6 +46,7 @@ public class Select {
         this.tables = new ArrayList<>();
         this.columnExprs = new ArrayList<>();
         this.columnAliases = new ArrayList<>();
+        this.having = new ArrayList<>();
         this.random = false;
 
         joinType = JoinType.NORMAL;
@@ -85,6 +89,20 @@ public class Select {
         checkColumn(column, false);
         columnExprs.add(fnName + "(`" + column + "`)");
         columnAliases.add(alias);
+        return this;
+    }
+
+    public Select search(String keyword, String alias, String ... column) {
+        for (String c : column) {
+            checkColumn(c, false);
+        }
+        List<String> modified = Arrays.asList(column).stream().map(s -> "`" + s + "`").collect(Collectors.toList());
+        columnExprs.add("MATCH(" + StringUtils.join(modified, ",") + ") AGAINST ('" + keyword + "')");
+        columnAliases.add(alias);
+
+        having.add("`" + alias + "` > 0");
+        orderBy.add("`" + alias + "` DESC");
+
         return this;
     }
 
@@ -248,32 +266,33 @@ public class Select {
             sb.append("*");
         }
 
-        sb.append(" FROM " + StringUtils.join(tables.stream().map((s) -> {
-            return "`" + s + "`";
-        }).toArray(), " " + joinType.sqlString() + " "));
-        if (tables.size() > 1) {
-            sb.append(" ON ");
+        if (tables.size() == 1) {
+            sb.append(" FROM " + "`" + tables.get(0) + "`");
+        } else {
+            sb.append(" FROM ");
+            for (int t = 0; t < tables.size() - 1; t++) {
+                String t1 = tables.get(t);
+                String t2 = tables.get(t + 1);
+                Metadata m1 = DB.getMetadata(t1);
+                Metadata m2 = DB.getMetadata(t2);
 
-            if (joinConditions == null) {
-                joinConditions = new ArrayList<String>();
-                for (int t = 0; t < tables.size() - 1; t++) {
-                    String t1 = tables.get(t);
-                    String t2 = tables.get(t + 1);
-                    Metadata m1 = DB.getMetadata(t1);
-                    Metadata m2 = DB.getMetadata(t2);
-
-                    Constraint c = Constraint.to(m1.constraints, t2);
-                    if (c == null)
-                        c = Constraint.to(m2.constraints, t1);
-
-                    joinConditions.add("`" + c.sourceTable + "`.`" + c.sourceColumn + "`=`" + c.destTable + "`.`" + c
-                            .destColumn + "`");
+                Constraint c = Constraint.to(m1.constraints, t2);
+                if (c == null)
+                    c = Constraint.to(m2.constraints, t1);
+                if (t == 0) {
+                    sb.append("`" + t1 + "` " + joinType.sqlString() + " `" + t2 + "` ON ");
+                } else {
+                    sb.append(" " + joinType.sqlString() + " `" + t2 + "` ON ");
                 }
+                sb.append("`" + c.sourceTable + "`.`" + c.sourceColumn + "`=`" + c.destTable + "`.`" + c
+                        .destColumn + "`");
             }
-            sb.append("(" + StringUtils.join(joinConditions, " AND ") + ")");
         }
 
         whereStatement(sb);
+        if (having.size() > 0) {
+            sb.append(" HAVING " + StringUtils.join(having, ","));
+        }
         if (groupBy.size() > 0) {
             sb.append(" GROUP BY " + StringUtils.join(groupBy, ","));
         }
@@ -383,7 +402,10 @@ public class Select {
         }
     }
 
-
+    public Select start(int s) {
+        start = s;
+        return this;
+    }
 
     public Select limit(int l) {
         limit = l;

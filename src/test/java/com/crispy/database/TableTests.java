@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import com.crispy.log.Appender;
 import com.crispy.log.Log;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -24,10 +25,13 @@ public class TableTests {
     @BeforeClass
     public static void initDB() throws SQLException {
         Log.getRoot().appender(Appender.create("console").level(Level.DEBUG).console());
+    }
 
-        DB.drop("localhost", "tests_table", "root", "harsh");
-        DB.create("localhost", "tests_table", "root", "harsh");
-        DB.init("tests_table", "root", "harsh");
+    @Before
+    public void setup() throws SQLException {
+        DB.drop("localhost", "tests_table", "root", "root");
+        DB.create("localhost", "tests_table", "root", "root");
+        DB.init("tests_table", "root", "root");
     }
 
     @Test
@@ -42,7 +46,7 @@ public class TableTests {
                 .create();
 
         Table.get("user").columns(Column.bigInteger("id", true), Column.text("name", 128)).create();
-
+        
         Table.get("schedule").columns(Column.bigInteger("id", true),
                 Column.bigInteger("lecture"),
                 Column.bigInteger("userid"),
@@ -66,7 +70,7 @@ public class TableTests {
             Insert.withTable("schedule").object("userid", i + 1).object("lecture", 2).object("duration", 10).execute();
         }
 
-        assertEquals(10, Select.withTable("user", "course", "lecture", "schedule").rows().getRows().size());
+        assertEquals(10, Select.withTable("user", "schedule", "lecture", "course").rows().getRows().size());
     }
 
     @Test
@@ -204,7 +208,7 @@ public class TableTests {
         assertEquals(100, rows.get(1).byName("balance").asLong().intValue());
 
         assertEquals("c", rows.get(2).byName("name").asString());
-        assertEquals(0, rows.get(2).byName("balance").asLong().intValue());
+        assertEquals(0, rows.get(2).byName("balance").def(0).asLong().intValue());
     }
 
     @Test
@@ -307,7 +311,8 @@ public class TableTests {
     }
 
     @After
-    public void tearDown() {
-        Table.get("booboo").drop(true);
+    public void tearDown() throws SQLException {
+        DB.shutdown();
+        DB.drop("localhost", "tests_table", "root", "root");
     }
 }

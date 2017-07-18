@@ -12,7 +12,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 public @interface GetMethod {
     String path() default "";
-    String server() default "";
     String template() default "";
     boolean utf8() default true;
 }

@@ -123,8 +123,8 @@ public class DB {
         if (INSTANCE.mDS != null) {
             try {
                 INSTANCE.mDS.close();
-                Driver d = DriverManager.getDriver(INSTANCE.mDS.getUrl());
-                DriverManager.deregisterDriver(d);
+                // Driver d = DriverManager.getDriver(INSTANCE.mDS.getUrl());
+                // DriverManager.deregisterDriver(d);
             } catch (Exception e) {
                 e.printStackTrace();
             }
