@@ -70,6 +70,10 @@ public class Cloud {
 	public static boolean localMode = false;
 	private static AWSCredentials credentials;
 
+	public static void init() {
+
+	}
+
 	public static void init(String credentialsFile) throws Exception {
 		Properties props = new Properties();
 		props.load(new FileReader(credentialsFile));

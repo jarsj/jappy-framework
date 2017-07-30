@@ -13,5 +13,6 @@ import java.lang.annotation.Target;
 public @interface GetMethod {
     String path() default "";
     String template() default "";
+    boolean jsonp() default false;
     boolean utf8() default true;
 }
