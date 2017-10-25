@@ -15,6 +15,7 @@ import java.util.TreeSet;
 
 import javax.servlet.http.HttpServletResponse;
 
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.crispy.net.Get;
 import com.crispy.net.Http;
 import org.apache.commons.codec.binary.Base64;
@@ -69,6 +70,12 @@ public class Cloud {
 
 	public static boolean localMode = false;
 	private static AWSCredentials credentials;
+
+	public static void init() {
+		credentials = new DefaultAWSCredentialsProviderChain()
+				.getCredentials();
+
+	}
 
 	public static void init(String credentialsFile) throws Exception {
 		Properties props = new Properties();

@@ -5,9 +5,13 @@ import org.apache.catalina.connector.Connector;
 import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.coyote.http11.Http11NioProtocol;
+import org.apache.tomcat.util.descriptor.web.ErrorPage;
+import org.apache.tomcat.util.descriptor.web.FilterDef;
+import org.apache.tomcat.util.descriptor.web.FilterMap;
 import org.apache.tomcat.websocket.server.Constants;
 import org.apache.tomcat.websocket.server.WsContextListener;
 
+import javax.servlet.Filter;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.annotation.MultipartConfig;
@@ -35,6 +39,11 @@ public class Server {
     private HashMap<Class<? extends HttpServlet>, HashMap<String, String>> mInitParams;
     private static List<Class> websocketEndpoints = new ArrayList<>();
     private AtomicBoolean started;
+    private List<FilterDef> filterDefs;
+    private List<FilterMap> filterMaps;
+
+    private String errorPage;
+    private String notFound;
 
     public Server(String ip, int port) {
         tomcat = new Tomcat();
@@ -49,6 +58,8 @@ public class Server {
         mServletObjects = new ArrayList<>();
         mInitParams = new HashMap<Class<? extends HttpServlet>, HashMap<String, String>>();
         websocketEndpoints = new ArrayList<>();
+        filterDefs = new ArrayList<>();
+        filterMaps = new ArrayList<>();
     }
     public Server(int port) {
         this(null, port);
@@ -111,6 +122,20 @@ public class Server {
                 annotation.loadOnStartup());
     }
 
+    public void addFilter(String filterName, Class<? extends Filter> filterClass, String ... patterns) {
+        FilterDef fdef = new FilterDef();
+        fdef.setFilterName(filterName);
+        fdef.setFilterClass(filterClass.getName());
+        filterDefs.add(fdef);
+
+        FilterMap map = new FilterMap();
+        map.setFilterName(filterName);
+        for (String pattern : patterns) {
+            map.addURLPattern(pattern);
+        }
+        filterMaps.add(map);
+    }
+
     public void addServlet(Class<? extends HttpServlet> servletClass, Map<String, String> initParams) {
         mServlets.add(servletClass);
         mInitParams.put(servletClass, new HashMap<String, String>(initParams));
@@ -122,6 +147,14 @@ public class Server {
 
     public void setWelcomeFile(String wf) {
         this.welcomeFile = wf;
+    }
+
+    public void setErrorPage(String errorPage) {
+        this.errorPage = errorPage;
+    }
+
+    public void setNotFound(String notFound) {
+        this.notFound = notFound;
     }
 
     public boolean isStarted() {
@@ -147,6 +180,21 @@ public class Server {
         Context ctx = tomcat.addContext("", ctxtDir.getAbsolutePath());
         ctx.addApplicationListener(Config.class.getName());
         ctx.addMimeMapping("svg", "image/svg+xml");
+        ctx.addMimeMapping("css", "text/css");
+        ctx.addMimeMapping("js", "text/javascript");
+
+        if (this.errorPage != null) {
+            ErrorPage error = new ErrorPage();
+            error.setExceptionType("java.lang.Exception");
+            error.setLocation(this.errorPage);
+            ctx.addErrorPage(error);
+        }
+        if (this.notFound != null) {
+            ErrorPage notFound = new ErrorPage();
+            notFound.setErrorCode(404);
+            notFound.setLocation(this.notFound);
+            ctx.addErrorPage(notFound);
+        }
 
         if (this.welcomeFile != null)
             ctx.addWelcomeFile(welcomeFile);
@@ -154,12 +202,21 @@ public class Server {
         if (mDefaultPatterns == null || mDefaultPatterns.size() > 0) {
             Tomcat.addServlet(ctx, "default", new DefaultServlet());
         }
+
         if (mDefaultPatterns == null) {
             ctx.addServletMapping("/", "default");
         } else if (mDefaultPatterns.size() > 0) {
             for (String pattern : mDefaultPatterns) {
                 ctx.addServletMapping(pattern, "default");
             }
+        }
+
+        for (FilterDef filter : filterDefs) {
+            ctx.addFilterDef(filter);
+        }
+
+        for (FilterMap filter : filterMaps) {
+            ctx.addFilterMap(filter);
         }
 
         for (Class<? extends HttpServlet> servlet : mServlets) {
