@@ -15,7 +15,9 @@ import java.util.TreeSet;
 
 import javax.servlet.http.HttpServletResponse;
 
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+import com.amazonaws.auth.*;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.crispy.net.Get;
 import com.crispy.net.Http;
 import org.apache.commons.codec.binary.Base64;
@@ -27,8 +29,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
@@ -69,24 +69,32 @@ public class Cloud {
 	private static final Log LOG = Log.get("cloud");
 
 	public static boolean localMode = false;
-	private static AWSCredentials credentials;
+	private static AWSCredentialsProvider credentials;
 
 	public static void init() {
-		credentials = new DefaultAWSCredentialsProviderChain()
-				.getCredentials();
+		credentials = new DefaultAWSCredentialsProviderChain();
 
 	}
 
 	public static void init(String credentialsFile) throws Exception {
 		Properties props = new Properties();
 		props.load(new FileReader(credentialsFile));
-		credentials = new BasicAWSCredentials(props.getProperty("accessKey"), 
-				props.getProperty("secretKey"));
+		init(props.getProperty("accessKey"), props.getProperty("secretKey"));
 		System.setProperty("com.amazonaws.sdk.disableCertChecking", "true");
 	}
 
 	public static void init(String accessKey, String secretKey) {
-		credentials = new BasicAWSCredentials(accessKey, secretKey);
+		credentials = new AWSCredentialsProvider() {
+			@Override
+			public AWSCredentials getCredentials() {
+				return new BasicAWSCredentials(accessKey, secretKey);
+			}
+
+			@Override
+			public void refresh() {
+
+			}
+		};
 		System.setProperty("com.amazonaws.sdk.disableCertChecking", "true");
 	}
 
@@ -105,10 +113,10 @@ public class Cloud {
 	}
 
 	public static AWSCredentials getCredentials() {
-		return credentials;
+		return credentials.getCredentials();
 	}
 
-	private AmazonS3Client s3;
+	private AmazonS3 s3;
 	private String bucket;
 	private AccessControlList acl;
 
@@ -119,7 +127,7 @@ public class Cloud {
 
 	public static Cloud s3(String bucket) {
 		Cloud c = new Cloud();
-		c.s3 = new AmazonS3Client(credentials);
+		c.s3 = AmazonS3ClientBuilder.standard().withCredentials(credentials).build();
 		c.bucket = bucket;
 		return c;
 	}
