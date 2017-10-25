@@ -15,6 +15,7 @@ import java.util.TreeSet;
 
 import javax.servlet.http.HttpServletResponse;
 
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.crispy.net.Get;
 import com.crispy.net.Http;
 import org.apache.commons.codec.binary.Base64;
@@ -71,6 +72,8 @@ public class Cloud {
 	private static AWSCredentials credentials;
 
 	public static void init() {
+		credentials = new DefaultAWSCredentialsProviderChain()
+				.getCredentials();
 
 	}
 
